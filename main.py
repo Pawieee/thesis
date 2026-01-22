@@ -1,5 +1,10 @@
 import os
-from modules.utils import dataset_dl, prepare_data_pipeline, build_embedding_model
+from modules.utils import (
+    dataset_dl,
+    prepare_data_pipeline,
+    build_embedding_model,
+    compile_and_train,
+)
 
 DEFAULT_DATASET_PATH = "signatures"
 
@@ -62,7 +67,6 @@ def main():
 
     # 4. Compile, Train, and Save
     # This handles the training loop, loss compilation, callbacks, and saving
-    """
     print(f"\n[4/4] Starting Training (Epochs: {EPOCHS}, Patience: {PATIENCE})...")
     history = compile_and_train(
         model=model,
@@ -72,9 +76,8 @@ def main():
         margin=MARGIN,
         epochs=EPOCHS,
         patience=PATIENCE,
-        save_path=MODEL_SAVE_PATH
+        save_path=MODEL_SAVE_PATH,
     )
-    """
     print("\n=== Pipeline Execution Complete ===")
 
 
