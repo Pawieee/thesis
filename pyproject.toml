@@ -1,0 +1,15 @@
+[project]
+name = "densenet"
+version = "0.1.0"
+description = "Densenet + CBAM + Triplet Network for OSV"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "kagglehub>=0.4.1",
+    "opencv-python>=4.13.0.90",
+    "scikit-learn>=1.8.0",
+    "tensorflow>=2.20.0",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "off"
