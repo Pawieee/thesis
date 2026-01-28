@@ -1,84 +1,81 @@
 import os
+import numpy as np
+from sklearn.model_selection import train_test_split
 from modules.utils import (
     dataset_dl,
-    prepare_data_pipeline,
-    build_embedding_model,
-    compile_and_train,
+    load_data_writer_independent,
+    run_kfold_training,
+    evaluate_test_set,
+    plot_training_history,
 )
 
-DEFAULT_DATASET_PATH = "signatures"
-
-# Image Paramters
-IMG_HEIGHT = 224
-IMG_WIDTH = 224
-IMG_CHANNELS = 3
-
-# Training Hyperparameters
-BATCH_SIZE = 24
-K_INSTANCES = 2
-EMBEDDING_DIM = 128
-LEARNING_RATE = 0.0005
-MARGIN = 1.0
-EPOCHS = 75
-PATIENCE = 10
-
-MODEL_SAVE_PATH = "densenet_cbam_triplet_model.h5"
+# === CONFIGURATION ===
+CONFIG = {
+    "USE_CBAM": True,
+    "DEFAULT_DATASET_PATH": "signatures",
+    "MODEL_SAVE_PATH": "densenet_cbam_best.keras",
+    # Image & Hyperparameters
+    "IMG_HEIGHT": 224,
+    "IMG_WIDTH": 224,
+    "IMG_CHANNELS": 3,
+    "FOLDS": 5,
+    "BATCH_SIZE": 4,
+    "K_INSTANCES": 2,
+    "EMBEDDING_DIM": 128,
+    "LEARNING_RATE": 0.001,
+    "MARGIN": 1.0,
+    "EPOCHS": 100,
+}
 
 
 def main():
-    print("=== Starting Signature Verification Training Pipeline ===\n")
+    print("=== Signature Verification Pipeline (K-Fold) ===\n")
 
     # 1. Dataset Resolution
-    # Check if dataset exists, if not, try to download it
-    if os.path.exists(DEFAULT_DATASET_PATH):
-        dataset_path = DEFAULT_DATASET_PATH
-        print(f"[1/4] Found existing dataset at: {dataset_path}")
+    if os.path.exists(CONFIG["DEFAULT_DATASET_PATH"]):
+        dataset_path = CONFIG["DEFAULT_DATASET_PATH"]
     else:
-        print(
-            f"[1/4] Dataset not found at '{DEFAULT_DATASET_PATH}'. Attempting download..."
-        )
         try:
             dataset_path = dataset_dl()
-            print(f"      Dataset downloaded to: {dataset_path}")
         except Exception as e:
-            print(f"      CRITICAL ERROR: Failed to download dataset. {e}")
+            print(f"[ERROR] {e}")
             return
 
-    # 2. Prepare Data Generators
-    # This handles loading, preprocessing, splitting, and creating the balanced batch generators
-    print("\n[2/4] Preparing Data Generators...")
+    # 2. Load & Split Data
+    print("\n[INFO] Loading Data...")
     try:
-        train_gen, val_gen = prepare_data_pipeline(
-            dataset_path=dataset_path,
-            img_size=(IMG_HEIGHT, IMG_WIDTH),
-            batch_size=BATCH_SIZE,
-            k_instances=K_INSTANCES,
+        X, y, writer_ids = load_data_writer_independent(
+            dataset_path, img_size=(CONFIG["IMG_HEIGHT"], CONFIG["IMG_WIDTH"])
         )
+        NUM_WRITERS = len(np.unique(writer_ids))
+
+        # 80/20 Writer-Independent Split
+        unique_writers = np.unique(writer_ids)
+        writers_tv, writers_test = train_test_split(
+            unique_writers, test_size=0.2, random_state=42
+        )
+
+        # Create Masks
+        tv_mask = np.isin(writer_ids, writers_tv)
+        test_mask = np.isin(writer_ids, writers_test)
+
+        X_tv, y_tv, ids_tv = X[tv_mask], y[tv_mask], writer_ids[tv_mask]
+        X_test, y_test, ids_test = X[test_mask], y[test_mask], writer_ids[test_mask]
+
+        print(f"Train/Val: {len(X_tv)} samples ({len(writers_tv)} writers)")
+        print(f"Test:      {len(X_test)} samples ({len(writers_test)} writers)")
+
     except Exception as e:
-        print(f"      CRITICAL ERROR: {e}")
+        print(f"CRITICAL ERROR: {e}")
         return
 
-    # 3. Build Model Architecture
-    print("\n[3/4] Building Model Architecture...")
-    model = build_embedding_model(
-        input_shape=(IMG_HEIGHT, IMG_WIDTH, IMG_CHANNELS), embedding_dim=EMBEDDING_DIM
-    )
-    model.summary()  # Uncomment if you want to see the model summary
+    # 3. Run K-Fold Training
+    best_model, histories = run_kfold_training(X_tv, y_tv, ids_tv, CONFIG)
 
-    # 4. Compile, Train, and Save
-    # This handles the training loop, loss compilation, callbacks, and saving
-    print(f"\n[4/4] Starting Training (Epochs: {EPOCHS}, Patience: {PATIENCE})...")
-    history = compile_and_train(
-        model=model,
-        train_gen=train_gen,
-        val_gen=val_gen,
-        learning_rate=LEARNING_RATE,
-        margin=MARGIN,
-        epochs=EPOCHS,
-        patience=PATIENCE,
-        save_path=MODEL_SAVE_PATH,
-    )
-    print("\n=== Pipeline Execution Complete ===")
+    # 4. Evaluate on Test Set
+    if best_model:
+        evaluate_test_set(best_model, X_test, y_test, ids_test, NUM_WRITERS)
+        plot_training_history(histories)
 
 
 if __name__ == "__main__":
