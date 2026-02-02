@@ -2,13 +2,13 @@ import os
 from kaggle.api.kaggle_api_extended import KaggleApi
 
 
-def download_bhsig_dataset(dataset_name: str = "nth2165/bhsig260-hindi-bengali", download_path: str = "data"):
+def download_kaggle_dataset(dataset_name: str, download_path: str):
     """
-    Download the BHSIG260 dataset from Kaggle.
-    
+    Download a dataset from Kaggle.
+
     Args:
-        dataset_name: Kaggle dataset handle (default: nth2165/bhsig260-hindi-bengali)
-        download_path: Directory path where the dataset will be downloaded (default: data)
+        dataset_name: Kaggle dataset handle (e.g., "owner/dataset")
+        download_path: Directory path where the dataset will be downloaded
     """
     # Create download directory if it doesn't exist
     os.makedirs(download_path, exist_ok=True)
@@ -26,7 +26,14 @@ def main():
     print("Hello from deep-learning-based-signature-forgery-detection-for-personal-identity-authentication!")
     
     # Download the BHSIG260 dataset
-    download_bhsig_dataset()
+    print("\n=== Downloading BHSig260 Dataset ===")
+    download_kaggle_dataset("nth2165/bhsig260-hindi-bengali", "data")
+    
+    # Download the CEDAR dataset
+    print("\n=== Downloading CEDAR Dataset ===")
+    download_kaggle_dataset("shreelakshmigp/cedardataset", "data/cedardataset")
+    
+    print("\n✅ All datasets downloaded successfully!")
 
 
 if __name__ == "__main__":
