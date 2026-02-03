@@ -74,28 +74,35 @@ class DenseNetFeatureExtractor(nn.Module):
 
         # Load pre-trained DenseNet-121 model
         weights_obj = models.DenseNet121_Weights.IMAGENET1K_V1 if weights == 'imagenet' else None
-        densenet = models.densenet121(weights=weights_obj)
+        original_model = models.densenet121(weights=weights_obj)
+        features = original_model.features
         
         # DenseNet-121 outputs 1024 features
-        original_dim = 1024
-
-        # Extract the features module (everything except the classifier)
-        self.backbone = densenet.features
-        self.output_dim = output_dim
-
-        # Add CBAM attention module after feature extraction
-        self.cbam = CBAMBlock(original_dim, ratio=8)
+        self.initial_layers = nn.Sequential(*list(features.children())[:4])
         
-        # Global average pooling
+        # Block 1 + Transition 1
+        self.block1 = features.denseblock1
+        self.trans1 = features.transition1
+        self.cbam1 = CBAMBlock(channels=features.transition1.conv.out_channels) # New!
+        
+        # Block 2 + Transition 2
+        self.block2 = features.denseblock2
+        self.trans2 = features.transition2
+        self.cbam2 = CBAMBlock(channels=features.transition2.conv.out_channels) # New!
+        
+        # Block 3 + Transition 3
+        self.block3 = features.denseblock3
+        self.trans3 = features.transition3
+        self.cbam3 = CBAMBlock(channels=features.transition3.conv.out_channels) # New!
+        
+        # Block 4 + Final Norm
+        self.block4 = features.denseblock4
+        self.norm5 = features.norm5
+        self.cbam4 = CBAMBlock(channels=1024) # New! (Output of denseblock4 is 1024)
+        
+        # 3. Global Pooling & Embedding
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-
-        # Add an optional linear layer if the desired output dimension
-        # differs from DenseNet-121's original feature dimension (1024).
-        if self.output_dim != original_dim:
-            self.fc = nn.Linear(original_dim, self.output_dim)
-        else:
-            # If dimensions match, use Identity to avoid unnecessary layer
-            self.fc = nn.Identity()
+        self.fc = nn.Linear(1024, output_dim) if output_dim != 1024 else nn.Identity()
 
 
     def forward(self, x):
@@ -109,18 +116,29 @@ class DenseNetFeatureExtractor(nn.Module):
             torch.Tensor: Output feature vector. Shape: (batch_size, output_dim).
         """
         # Pass input through the DenseNet backbone
-        features = self.backbone(x) # Shape: (batch_size, 1024, H, W)
+        x = self.initial_layers(x)
 
-        # Apply CBAM attention module
-        features = self.cbam(features) # Shape: (batch_size, 1024, H, W)
-
-        # Global average pooling
-        features = self.avgpool(features) # Shape: (batch_size, 1024, 1, 1)
+        # Pass through Block 1 -> Transition -> CBAM
+        x = self.block1(x)
+        x = self.trans1(x)
+        x = self.cbam1(x) # Attention applied here!
         
-        # Flatten
-        features = torch.flatten(features, 1) # Shape: (batch_size, 1024)
-
-        # Apply the final linear layer (or Identity if dimensions match)
-        output_features = self.fc(features) # Shape: (batch_size, output_dim)
-
-        return output_features
+        # Pass through Block 2 -> Transition -> CBAM
+        x = self.block2(x)
+        x = self.trans2(x)
+        x = self.cbam2(x)
+        
+        # Pass through Block 3 -> Transition -> CBAM
+        x = self.block3(x)
+        x = self.trans3(x)
+        x = self.cbam3(x)
+        
+        # Pass through Block 4 -> Norm -> CBAM
+        x = self.block4(x)
+        x = self.norm5(x)
+        x = self.cbam4(x)
+        
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+        return x

@@ -1,6 +1,6 @@
 import os
 from kaggle.api.kaggle_api_extended import KaggleApi
-
+from models import feature_extractor
 
 def download_kaggle_dataset(dataset_name: str, download_path: str):
     """
@@ -27,14 +27,15 @@ def main():
     
     # Download the BHSIG260 dataset
     print("\n=== Downloading BHSig260 Dataset ===")
-    download_kaggle_dataset("nth2165/bhsig260-hindi-bengali", "data")
+    # download_kaggle_dataset("nth2165/bhsig260-hindi-bengali", "data")
     
     # Download the CEDAR dataset
     print("\n=== Downloading CEDAR Dataset ===")
-    download_kaggle_dataset("shreelakshmigp/cedardataset", "data/cedardataset")
+    # download_kaggle_dataset("shreelakshmigp/cedardataset", "data/cedardataset")
     
     print("\n✅ All datasets downloaded successfully!")
-
+    model = feature_extractor.DenseNetFeatureExtractor()
+    print(model)
 
 if __name__ == "__main__":
     main()
