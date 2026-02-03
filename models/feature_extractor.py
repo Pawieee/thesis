@@ -56,25 +56,25 @@ class CBAMBlock(nn.Module):
 class DenseNetFeatureExtractor(nn.Module):
     """
     A feature extractor module based on DenseNet-121 with CBAM block integration.
-
-    This module loads a pre-trained DenseNet-121 backbone, integrates CBAM 
-    attention modules, and outputs the feature vector from the penultimate layer.
     """
-    def __init__(self, backbone_name='densenet121', output_dim=1024, weights='imagenet'):
+    def __init__(self, backbone_name='densenet121', output_dim=1024, pretrained=True):
         """
         Initializes the DenseNetFeatureExtractor.
+
         Args:
-            backbone_name (str): The name of the backbone to use. Currently supports 'densenet121'.
-                                 Defaults to 'densenet121'.
-            output_dim (int): The desired dimension of the output feature vector.
-                              DenseNet-121 outputs 1024 features by default. Defaults to 1024.
-            weights (str): Pre-trained weights to load. Options: 'imagenet' or None. Defaults to 'imagenet'.
+            backbone_name (str): The name of the backbone to use. Defaults to 'densenet121'.
+            output_dim (int): The desired dimension of the output feature vector. Defaults to 1024.
+            pretrained (bool): Whether to load pre-trained ImageNet weights. Defaults to True.
         """
         super().__init__()
 
-        # Load pre-trained DenseNet-121 model
-        weights_obj = models.DenseNet121_Weights.IMAGENET1K_V1 if weights == 'imagenet' else None
-        densenet = models.densenet121(weights=weights_obj)
+        # 1. Load the specified DenseNet model
+        if backbone_name == 'densenet121':
+            # Logic matches your ResNet reference: map bool -> weights object
+            weights = models.DenseNet121_Weights.IMAGENET1K_V1 if pretrained else None
+            densenet = models.densenet121(weights=weights)
+        else:
+            raise ValueError("Unsupported backbone_name. Currently only 'densenet121' is supported.")
         
         # DenseNet-121 outputs 1024 features
         original_dim = 1024
@@ -83,44 +83,38 @@ class DenseNetFeatureExtractor(nn.Module):
         self.backbone = densenet.features
         self.output_dim = output_dim
 
-        # Add CBAM attention module after feature extraction
+        # Add CBAM attention module
         self.cbam = CBAMBlock(original_dim, ratio=8)
         
         # Global average pooling
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         # Add an optional linear layer if the desired output dimension
-        # differs from DenseNet-121's original feature dimension (1024).
+        # differs from the backbone's original feature dimension.
         if self.output_dim != original_dim:
             self.fc = nn.Linear(original_dim, self.output_dim)
+            print(f"Added final linear layer to map features from {original_dim} to {self.output_dim} dimensions.")
         else:
             # If dimensions match, use Identity to avoid unnecessary layer
             self.fc = nn.Identity()
 
-
     def forward(self, x):
         """
         Performs the forward pass to extract features.
-
-        Args:
-            x (torch.Tensor): Input image tensor. Shape: (batch_size, 3, H, W).
-
-        Returns:
-            torch.Tensor: Output feature vector. Shape: (batch_size, output_dim).
         """
         # Pass input through the DenseNet backbone
-        features = self.backbone(x) # Shape: (batch_size, 1024, H, W)
+        features = self.backbone(x)      # Shape: (batch_size, 1024, H, W)
 
         # Apply CBAM attention module
-        features = self.cbam(features) # Shape: (batch_size, 1024, H, W)
+        features = self.cbam(features)   # Shape: (batch_size, 1024, H, W)
 
         # Global average pooling
-        features = self.avgpool(features) # Shape: (batch_size, 1024, 1, 1)
+        features = self.avgpool(features)# Shape: (batch_size, 1024, 1, 1)
         
         # Flatten
         features = torch.flatten(features, 1) # Shape: (batch_size, 1024)
 
         # Apply the final linear layer (or Identity if dimensions match)
-        output_features = self.fc(features) # Shape: (batch_size, output_dim)
+        output_features = self.fc(features)   # Shape: (batch_size, output_dim)
 
         return output_features
