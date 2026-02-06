@@ -82,26 +82,28 @@ class DenseNetFeatureExtractor(nn.Module):
 
         
         # Block 1 + Transition 1
-        self.cbam1 = CBAMBlock(channels=64)
+        # self.cbam1 = CBAMBlock(channels=64)
         self.block1 = features.denseblock1
         self.trans1 = features.transition1
-
+        self.cbam1 = CBAMBlock(channels=features.transition1.conv.out_channels)
         
         # Block 2 + Transition 2
-        self.cbam2 = CBAMBlock(channels=features.transition1.conv.out_channels)
+        # self.cbam2 = CBAMBlock(channels=features.transition1.conv.out_channels)
         self.block2 = features.denseblock2
         self.trans2 = features.transition2
 
-        
+        self.cbam2 = CBAMBlock(channels=features.transition2.conv.out_channels)        
         # Block 3 + Transition 3
-        self.cbam3 = CBAMBlock(channels=features.transition2.conv.out_channels)        
+        # self.cbam3 = CBAMBlock(channels=features.transition2.conv.out_channels)        
         self.block3 = features.denseblock3
         self.trans3 = features.transition3
-        
+
+        self.cbam3 = CBAMBlock(channels=features.transition3.conv.out_channels)
         # Block 4 + Final Norm
-        self.cbam4 = CBAMBlock(channels=features.transition3.conv.out_channels)
+        # self.cbam4 = CBAMBlock(channels=features.transition3.conv.out_channels)
         self.block4 = features.denseblock4
         self.norm5 = features.norm5
+        self.cbam4 = CBAMBlock(channels=1024)
         
         # 3. Global Pooling & Embedding
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
@@ -114,23 +116,26 @@ class DenseNetFeatureExtractor(nn.Module):
         # Pass input through the DenseNet backbone
         x = self.initial_layers(x)
         
-        x = self.cbam1(x)
+        # x = self.cbam1(x)
         x = self.block1(x)
         x = self.trans1(x)
+        x = self.cbam1(x)
         
-        x = self.cbam2(x)  
+        # x = self.cbam2(x)  
         x = self.block2(x)
         x = self.trans2(x)
-        
-        x = self.cbam3(x)
+
+        x = self.cbam2(x) 
+        # x = self.cbam3(x)
         x = self.block3(x)
         x = self.trans3(x)
-        
-        x = self.cbam4(x)
+
+        x = self.cbam3(x)
+        # x = self.cbam4(x)
         x = self.block4(x)
         x = self.norm5(x)
  
-        
+        x = self.cbam4(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
