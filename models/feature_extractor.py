@@ -57,7 +57,7 @@ class DenseNetFeatureExtractor(nn.Module):
     """
     A feature extractor module based on DenseNet-121 with CBAM block integration.
     """
-    def __init__(self, backbone_name='densenet121', output_dim=1024, pretrained=True):
+    def __init__(self, backbone_name='densenet121', output_dim=1024, pretrained=True, baseline=False):
         """
         Initializes the DenseNetFeatureExtractor.
 
@@ -65,6 +65,7 @@ class DenseNetFeatureExtractor(nn.Module):
             backbone_name (str): The name of the backbone to use. Defaults to 'densenet121'.
             output_dim (int): The desired dimension of the output feature vector. Defaults to 1024.
             pretrained (bool): Whether to load pre-trained ImageNet weights. Defaults to True.
+            baseline (bool): Whether to use the baseline model without CBAM blocks. Defaults to False.
         """
         super().__init__()
 
@@ -77,61 +78,86 @@ class DenseNetFeatureExtractor(nn.Module):
             raise ValueError("Unsupported backbone_name. Currently only 'densenet121' is supported.")
         features = original_model.features
         
-        # DenseNet-121 outputs 1024 features
-        self.initial_layers = nn.Sequential(*list(features.children())[:4])
+        if self.baseline:
+            # Baseline mode: use full backbone with frozen weights
+            self.backbone = features
+            
+            # Freeze backbone parameters
+            for param in self.backbone.parameters():
+                param.requires_grad = False
+            
+            # 3. Global Pooling
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            
+            # Custom classification head for signature verification
+            # DenseNet-121 outputs 1024 features
+            self.custom_head = nn.Sequential(
+                nn.BatchNorm1d(1024),
+                nn.Dropout(p=0.5),
+                nn.Linear(1024, output_dim)
+            )
+        else:
+            # DenseNet-121 outputs 1024 features
+            self.initial_layers = nn.Sequential(*list(features.children())[:4])
 
-        
-        # Block 1 + Transition 1
-        self.cbam1 = CBAMBlock(channels=64)
-        self.block1 = features.denseblock1
-        self.trans1 = features.transition1
-
-        
-        # Block 2 + Transition 2
-        self.cbam2 = CBAMBlock(channels=features.transition1.conv.out_channels)
-        self.block2 = features.denseblock2
-        self.trans2 = features.transition2
-
-        
-        # Block 3 + Transition 3
-        self.cbam3 = CBAMBlock(channels=features.transition2.conv.out_channels)        
-        self.block3 = features.denseblock3
-        self.trans3 = features.transition3
-        
-        # Block 4 + Final Norm
-        self.cbam4 = CBAMBlock(channels=features.transition3.conv.out_channels)
-        self.block4 = features.denseblock4
-        self.norm5 = features.norm5
-        
-        # 3. Global Pooling & Embedding
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(1024, output_dim) if output_dim != 1024 else nn.Identity()
+            # Block 1 + Transition 1
+            self.cbam1 = CBAMBlock(channels=64)
+            self.block1 = features.denseblock1
+            self.trans1 = features.transition1
+            
+            # Block 2 + Transition 2
+            self.cbam2 = CBAMBlock(channels=features.transition1.conv.out_channels)
+            self.block2 = features.denseblock2
+            self.trans2 = features.transition2
+            
+            # Block 3 + Transition 3
+            self.cbam3 = CBAMBlock(channels=features.transition2.conv.out_channels)        
+            self.block3 = features.denseblock3
+            self.trans3 = features.transition3
+            
+            # Block 4 + Final Norm
+            self.cbam4 = CBAMBlock(channels=features.transition3.conv.out_channels)
+            self.block4 = features.denseblock4
+            self.norm5 = features.norm5
+            
+            # 3. Global Pooling & Embedding
+            self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+            self.fc = nn.Linear(1024, output_dim) if output_dim != 1024 else nn.Identity()
 
     def forward(self, x):
         """
         Performs the forward pass to extract features.
         """
+        if self.baseline:
+            # Baseline mode: pass through frozen backbone and custom head
+            x = self.backbone(x)
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+            x = self.custom_head(x)
+            return x
+        else:
+
         # Pass input through the DenseNet backbone
-        x = self.initial_layers(x)
-        
-        x = self.cbam1(x)
-        x = self.block1(x)
-        x = self.trans1(x)
-        
-        x = self.cbam2(x)  
-        x = self.block2(x)
-        x = self.trans2(x)
-        
-        x = self.cbam3(x)
-        x = self.block3(x)
-        x = self.trans3(x)
-        
-        x = self.cbam4(x)
-        x = self.block4(x)
-        x = self.norm5(x)
- 
-        
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.fc(x)
-        return x
+            x = self.initial_layers(x)
+            
+            x = self.cbam1(x)
+            x = self.block1(x)
+            x = self.trans1(x)
+            
+            x = self.cbam2(x)  
+            x = self.block2(x)
+            x = self.trans2(x)
+            
+            x = self.cbam3(x)
+            x = self.block3(x)
+            x = self.trans3(x)
+            
+            x = self.cbam4(x)
+            x = self.block4(x)
+            x = self.norm5(x)
+    
+            
+            x = self.avgpool(x)
+            x = torch.flatten(x, 1)
+            x = self.fc(x)
+            return x
