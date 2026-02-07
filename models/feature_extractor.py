@@ -68,6 +68,7 @@ class DenseNetFeatureExtractor(nn.Module):
             baseline (bool): Whether to use the baseline model without CBAM blocks. Defaults to False.
         """
         super().__init__()
+        self.baseline = baseline
 
         # 1. Load the specified DenseNet model
         if backbone_name == 'densenet121':
@@ -120,9 +121,13 @@ class DenseNetFeatureExtractor(nn.Module):
             self.block4 = features.denseblock4
             self.norm5 = features.norm5
             
-            # 3. Global Pooling & Embedding
+            # 3. Global Pooling & Regularized Dense Block
             self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-            self.fc = nn.Linear(1024, output_dim) if output_dim != 1024 else nn.Identity()
+            self.regularized_dense_block = nn.Sequential(
+                nn.BatchNorm1d(1024),
+                nn.Dropout(p=0.5),
+                nn.Linear(1024, output_dim)
+            )
 
     def forward(self, x):
         """
@@ -159,5 +164,5 @@ class DenseNetFeatureExtractor(nn.Module):
             
             x = self.avgpool(x)
             x = torch.flatten(x, 1)
-            x = self.fc(x)
+            x = self.regularized_dense_block(x)
             return x
