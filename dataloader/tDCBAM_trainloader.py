@@ -1,6 +1,8 @@
 import os
 import random
 import torch
+import numpy as np
+import cv2
 from torch.utils.data import Dataset
 from PIL import Image
 from torchvision import transforms
@@ -9,49 +11,122 @@ from torchvision import transforms
 # TRANSFORMATION UTILITIES (AUGMENTATION STRATEGY)
 # =============================================================================
 
-def get_pretraining_transforms(input_shape=(224, 224)):
+def preprocess_image(img, img_size=(224, 224)):
     """
-    Generates a robust data augmentation pipeline for signature pre-training.
-    
-    This pipeline includes geometric and photometric transformations to induce 
-    invariance to rotation, scale, stroke thickness, and lighting conditions.
+    Preprocess a signature image using grayscale + Otsu thresholding, inversion,
+    resize, and RGB conversion. Returns an RGB numpy array in [0, 1].
+    """
+    if img is None:
+        return None
+
+    if isinstance(img, Image.Image):
+        img = np.array(img)
+
+    if img.ndim == 3:
+        img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    else:
+        img_gray = img
+
+    _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    img_inv = cv2.bitwise_not(thresh)
+    img_resized = cv2.resize(img_inv, img_size)
+    img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_GRAY2RGB)
+    img_rgb = img_rgb.astype("float32") / 255.0
+
+    return img_rgb
+
+
+def get_pretraining_transforms(input_shape=(224, 224), preprocess=False, augment=True):
+    """
+    Generates a pre-training transform pipeline with optional preprocessing and augmentation.
     
     Args:
-        input_shape (tuple): Target input resolution (H, W). Default is (224, 224) for ResNet.
+        input_shape (tuple): Target input resolution (H, W). Default is (224, 224)
+        preprocess (bool): Apply grayscale + Otsu + inversion + resize before tensor conversion
+        augment (bool): Apply data augmentation (flip/rotation/affine)
         
     Returns:
         torchvision.transforms.Compose: The composition of transforms.
     """
-    return transforms.Compose([
-        # Resize inputs to the standard resolution expected by the backbone (e.g., ResNet34)
-        transforms.Resize(input_shape),
+    transform_list = []
+
+    if augment:
+        transform_list.extend([
+            # 1. Horizontal Flip: Creates mirror images for orientation invariance
+            transforms.RandomHorizontalFlip(p=0.5),
+            
+            # 2. Rotation: Up to 20 degrees to handle varying signature angles
+            transforms.RandomRotation(degrees=20),
+            
+            # 3. Affine Transform: Combines position shifts and zoom
+            # - translate=(0.2, 0.2): Shifts signature position by up to 20% horizontally and vertically
+            # - scale=(0.8, 1.2): Zooms in/out by up to 20% to show different detail levels
+            transforms.RandomAffine(
+                degrees=0,
+                translate=(0.2, 0.2),
+                scale=(0.8, 1.2),
+                fill=0
+            ),
+        ])
+
+    if preprocess:
+        transform_list.append(transforms.Lambda(lambda img: preprocess_image(img, img_size=input_shape)))
+    else:
+        # Resize inputs to the standard resolution expected by the backbone
+        transform_list.append(transforms.Resize(input_shape))
+
+    # Convert to Tensor (C, H, W) in range [0, 1]
+    transform_list.append(transforms.ToTensor())
+
+    # Normalize using ImageNet statistics (Mean and Std)
+    # This is mandatory for initializing with pre-trained weights.
+    transform_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+
+    return transforms.Compose(transform_list)
+
+
+def get_baseline_transforms(input_shape=(224, 224), preprocess=False, augment=True):
+    """
+    Generates baseline (classification) transform pipeline with optional preprocessing and augmentation.
+    
+    Args:
+        input_shape (tuple): Target input resolution (H, W). Default is (224, 224)
+        preprocess (bool): Apply grayscale + Otsu + inversion + resize before tensor conversion
+        augment (bool): Apply data augmentation (flip/rotation/affine)
         
-        # 1. Geometric Invariance: Random Rotation
-        # Signatures are rarely perfectly aligned. +/- 10 degrees simulates natural alignment noise.
-        transforms.RandomRotation(degrees=10),
-        
-        # 2. Stroke & Perspective Invariance: Random Affine
-        # Simulates different pen holding angles and slight distortions.
-        # shear=5 alters the slant of the signature.
-        transforms.RandomAffine(degrees=0, translate=(0.02, 0.02), scale=(0.95, 1.05), shear=5),
-        
-        # 3. Environmental Invariance: Color Jitter
-        # Randomizes brightness, contrast, and saturation to prevent the model from 
-        # relying on specific ink colors or paper whiteness.
-        transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3),
-        
-        # 4. Quality Invariance: Gaussian Blur
-        # Simulates low-resolution scanning artifacts or ink bleeding. 
-        # Crucial for Cross-Domain generalization (e.g., matching CEDAR vs BHSig quality).
-        transforms.RandomApply([transforms.GaussianBlur(kernel_size=3)], p=0.2),
-        
-        # Convert to Tensor (C, H, W) in range [0, 1]
-        transforms.ToTensor(),
-        
-        # Normalize using ImageNet statistics (Mean and Std)
-        # This is mandatory for initializing with pre-trained weights.
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    Returns:
+        torchvision.transforms.Compose: Training transforms
+        torchvision.transforms.Compose: Validation (no augment) transforms
+    """
+    train_list = []
+    val_list = []
+
+    if augment:
+        train_list.extend([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees=10),
+            transforms.RandomAffine(
+                degrees=0,
+                translate=(0.1, 0.1),
+                scale=(0.9, 1.1),
+                fill=0
+            ),
+        ])
+
+    if preprocess:
+        train_list.append(transforms.Lambda(lambda img: preprocess_image(img, img_size=input_shape)))
+        val_list.append(transforms.Lambda(lambda img: preprocess_image(img, img_size=input_shape)))
+    else:
+        train_list.append(transforms.Resize(input_shape))
+        val_list.append(transforms.Resize(input_shape))
+
+    train_list.append(transforms.ToTensor())
+    train_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+
+    val_list.append(transforms.ToTensor())
+    val_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+
+    return transforms.Compose(train_list), transforms.Compose(val_list)
 
 # =============================================================================
 # DATASET CLASS WITH HARD MINING
