@@ -1,4 +1,5 @@
 import os
+import subprocess
 from kaggle.api.kaggle_api_extended import KaggleApi
 from models import feature_extractor
 
@@ -34,8 +35,35 @@ def main():
     # download_kaggle_dataset("shreelakshmigp/cedardataset", "data/cedardataset")
     
     print("\n✅ All datasets downloaded successfully!")
+    
+    # Initialize sample model
+    print("\n=== Initializing Sample Model ===")
     model = feature_extractor.DenseNetFeatureExtractor()
     print(model)
+    print("✅ Model initialized successfully!")
+    
+    # Prepare split ratios
+    print("\n=== Preparing Split Ratios ===")
+    data_root = "data"
+    output_dir = "data/ratio_splits"
+    
+    prepare_script = os.path.join("scripts", "prepare_split_ratios.py")
+    cmd = [
+        "python",
+        prepare_script,
+        "--data_root", data_root,
+        "--output_dir", output_dir,
+        "--seed", "42",
+        "--ratios", "70,80,90"
+    ]
+    
+    print(f"Running: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=False)
+    
+    if result.returncode == 0:
+        print("\n✅ Split ratios prepared successfully!")
+    else:
+        print(f"\n⚠️ Warning: prepare_split_ratios.py exited with code {result.returncode}")
 
 if __name__ == "__main__":
     main()
