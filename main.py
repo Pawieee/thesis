@@ -28,11 +28,11 @@ def main():
     
     # Download the BHSIG260 dataset
     print("\n=== Downloading BHSig260 Dataset ===")
-    # download_kaggle_dataset("nth2165/bhsig260-hindi-bengali", "data")
+    download_kaggle_dataset("nth2165/bhsig260-hindi-bengali", "data")
     
     # Download the CEDAR dataset
     print("\n=== Downloading CEDAR Dataset ===")
-    # download_kaggle_dataset("shreelakshmigp/cedardataset", "data/cedardataset")
+    download_kaggle_dataset("shreelakshmigp/cedardataset", "data/cedardataset")
     
     print("\n✅ All datasets downloaded successfully!")
     

@@ -1,0 +1,38 @@
+{
+  "BHSig-Bengali (70:30)": {
+    "dataset": "BHSig-Bengali",
+    "split": "70:30",
+    "train_users": 70,
+    "test_users": 30,
+    "eer": 0.06666666666666667,
+    "accuracy": 0.95,
+    "auc": 0.9711111111111111,
+    "precision": 0.9354838709677419,
+    "recall": 0.9666666666666667,
+    "f1": 0.9508196721311475
+  },
+  "BHSig-Bengali (80:20)": {
+    "dataset": "BHSig-Bengali",
+    "split": "80:20",
+    "train_users": 80,
+    "test_users": 20,
+    "eer": 0.05,
+    "accuracy": 0.975,
+    "auc": 0.975,
+    "precision": 0.9523809523809523,
+    "recall": 1.0,
+    "f1": 0.975609756097561
+  },
+  "BHSig-Bengali (90:10)": {
+    "dataset": "BHSig-Bengali",
+    "split": "90:10",
+    "train_users": 90,
+    "test_users": 10,
+    "eer": 0.0,
+    "accuracy": 1.0,
+    "auc": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  }
+}
