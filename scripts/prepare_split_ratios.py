@@ -1,17 +1,18 @@
 """
-Script: Generate Train-Test Splits for Multiple Datasets and Split Ratios
-=========================================================================
-Generates user-level train/test splits for:
+Script: Generate Train-Val-Test Splits for Multiple Datasets and Split Ratios
+==============================================================================
+Generates user-level train/val/test splits for:
   - CEDAR (55 users)
   - BHSig-Bengali (100 users)
   - BHSig-Hindi (160 users)
 
-At configurable ratios: 70:30, 80:20, 90:10
+At configurable ratios: 65:18:18, 70:15:15, 60:20:20
 
 Output: JSON files compatible with both baseline and proposed (tDCBAM) pipelines.
 Each JSON has structure:
 {
     "train": { "user_id": {"genuine": [...], "forged": [...]} },
+    "val":   { "user_id": {"genuine": [...], "forged": [...]} },
     "test":  { "user_id": {"genuine": [...], "forged": [...]} }
 }
 
@@ -140,59 +141,84 @@ def parse_bhsig_subset(subset_root, prefix):
     return dict(valid)
 
 
-def create_split(user_dict, train_ratio, seed=42):
+def create_split(user_dict, train_ratio, val_ratio, seed=42):
     """
-    Splits users into train/test sets at the specified ratio.
+    Splits users into train/val/test sets at the specified ratios.
     
     Args:
         user_dict: {uid: {"genuine": [...], "forged": [...]}}
-        train_ratio: float (e.g., 0.7 for 70:30)
+        train_ratio: float (e.g., 0.65 for 65%)
+        val_ratio: float (e.g., 0.18 for 18%)
         seed: random seed
     
     Returns:
-        dict: {"train": {...}, "test": {...}}
+        dict: {"train": {...}, "val": {...}, "test": {...}}
     """
     user_ids = sorted(list(user_dict.keys()))
     
     random.seed(seed)
     random.shuffle(user_ids)
     
-    n_train = int(len(user_ids) * train_ratio)
+    total_users = len(user_ids)
+    n_train = int(total_users * train_ratio)
+    n_val = int(total_users * val_ratio)
+    
     # Ensure at least 1 user in each split
-    n_train = max(1, min(n_train, len(user_ids) - 1))
+    n_train = max(1, n_train)
+    n_val = max(1, n_val)
+    
+    # Adjust if splits exceed total
+    if n_train + n_val >= total_users:
+        n_train = max(1, total_users - 2)
+        n_val = 1
     
     train_ids = user_ids[:n_train]
-    test_ids = user_ids[n_train:]
+    val_ids = user_ids[n_train:n_train + n_val]
+    test_ids = user_ids[n_train + n_val:]
+    
+    # Ensure test has at least 1 user
+    if len(test_ids) == 0 and len(val_ids) > 1:
+        test_ids = [val_ids.pop()]
     
     split = {
         "train": {uid: user_dict[uid] for uid in train_ids},
+        "val": {uid: user_dict[uid] for uid in val_ids},
         "test": {uid: user_dict[uid] for uid in test_ids}
     }
     
-    return split, len(train_ids), len(test_ids)
+    return split, len(train_ids), len(val_ids), len(test_ids)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate train-test splits for signature datasets")
+    parser = argparse.ArgumentParser(description="Generate train-val-test splits for signature datasets")
     parser.add_argument('--data_root', type=str, required=True,
                         help='Root data directory (contains cedardataset/, bhsig260-hindi-bengali/)')
     parser.add_argument('--output_dir', type=str, required=True,
                         help='Directory to save split JSON files')
     parser.add_argument('--seed', type=int, default=42,
                         help='Random seed for reproducibility')
-    parser.add_argument('--ratios', type=str, default='70,80,90',
-                        help='Comma-separated train percentages (default: 70,80,90)')
+    parser.add_argument('--ratios', type=str, default='65:18:18,70:15:15,60:20:20',
+                        help='Comma-separated train:val:test percentages (default: 65:18:18,70:15:15,60:20:20)')
     args = parser.parse_args()
     
-    ratios = [int(r) / 100.0 for r in args.ratios.split(',')]
+    # Parse ratios from train:val:test format
+    ratio_triplets = []
+    for ratio_str in args.ratios.split(','):
+        parts = ratio_str.strip().split(':')
+        if len(parts) != 3:
+            print(f"ERROR: Invalid ratio format '{ratio_str}'. Expected train:val:test (e.g., 65:18:18)")
+            return
+        train_pct, val_pct, test_pct = map(int, parts)
+        ratio_triplets.append((train_pct / 100.0, val_pct / 100.0, test_pct / 100.0))
+    
     os.makedirs(args.output_dir, exist_ok=True)
     
     print("=" * 60)
-    print("GENERATING TRAIN-TEST SPLITS FOR ALL DATASETS")
+    print("GENERATING TRAIN-VAL-TEST SPLITS FOR ALL DATASETS")
     print("=" * 60)
     print(f"Data Root: {args.data_root}")
     print(f"Output: {args.output_dir}")
-    print(f"Ratios: {[f'{int(r*100)}:{int((1-r)*100)}' for r in ratios]}")
+    print(f"Ratios: {[f'{int(r[0]*100)}:{int(r[1]*100)}:{int(r[2]*100)}' for r in ratio_triplets]}")
     print(f"Seed: {args.seed}")
     print()
     
@@ -256,36 +282,43 @@ def main():
     summary = []
     
     for ds_name, user_dict in datasets.items():
-        for ratio in ratios:
-            train_pct = int(ratio * 100)
-            test_pct = 100 - train_pct
+        for train_ratio, val_ratio, test_ratio in ratio_triplets:
+            train_pct = int(train_ratio * 100)
+            val_pct = int(val_ratio * 100)
+            test_pct = int(test_ratio * 100)
             
-            split, n_train, n_test = create_split(user_dict, ratio, seed=args.seed)
+            split, n_train, n_val, n_test = create_split(user_dict, train_ratio, val_ratio, seed=args.seed)
             
             # Count total images
             train_gen = sum(len(v["genuine"]) for v in split["train"].values())
             train_forg = sum(len(v["forged"]) for v in split["train"].values())
+            val_gen = sum(len(v["genuine"]) for v in split["val"].values())
+            val_forg = sum(len(v["forged"]) for v in split["val"].values())
             test_gen = sum(len(v["genuine"]) for v in split["test"].values())
             test_forg = sum(len(v["forged"]) for v in split["test"].values())
             
-            fname = f"{ds_name}_split_{train_pct}_{test_pct}.json"
+            fname = f"{ds_name}_split_{train_pct}_{val_pct}_{test_pct}.json"
             fpath = os.path.join(args.output_dir, fname)
             
             with open(fpath, 'w', encoding='utf-8') as f:
                 json.dump(split, f, indent=2)
             
-            info = (f"  {ds_name} ({train_pct}:{test_pct}) | "
+            info = (f"  {ds_name} ({train_pct}:{val_pct}:{test_pct}) | "
                     f"Train: {n_train} users ({train_gen}G + {train_forg}F) | "
+                    f"Val: {n_val} users ({val_gen}G + {val_forg}F) | "
                     f"Test: {n_test} users ({test_gen}G + {test_forg}F) | "
                     f"Saved: {fname}")
             print(info)
             summary.append({
                 "dataset": ds_name,
-                "split": f"{train_pct}:{test_pct}",
+                "split": f"{train_pct}:{val_pct}:{test_pct}",
                 "train_users": n_train,
+                "val_users": n_val,
                 "test_users": n_test,
                 "train_genuine": train_gen,
                 "train_forged": train_forg,
+                "val_genuine": val_gen,
+                "val_forged": val_forg,
                 "test_genuine": test_gen,
                 "test_forged": test_forg,
                 "file": fname
