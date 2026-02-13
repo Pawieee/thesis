@@ -34,13 +34,13 @@ def main():
     print("\n=== Downloading CEDAR Dataset ===")
     download_kaggle_dataset("shreelakshmigp/cedardataset", "data/cedardataset")
     
-    print("\n✅ All datasets downloaded successfully!")
+    print("\nAll datasets downloaded successfully!")
     
     # Initialize sample model
     print("\n=== Initializing Sample Model ===")
     model = feature_extractor.DenseNetFeatureExtractor()
     print(model)
-    print("✅ Model initialized successfully!")
+    print("Model initialized successfully!")
     
     # Prepare split ratios
     print("\n=== Preparing Split Ratios ===")
@@ -61,9 +61,9 @@ def main():
     result = subprocess.run(cmd, capture_output=False)
     
     if result.returncode == 0:
-        print("\n✅ Split ratios prepared successfully!")
+        print("\nSplit ratios prepared successfully!")
     else:
-        print(f"\n⚠️ Warning: prepare_split_ratios.py exited with code {result.returncode}")
+        print(f"\nWarning: prepare_split_ratios.py exited with code {result.returncode}")
 
 if __name__ == "__main__":
     main()
