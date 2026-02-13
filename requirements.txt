@@ -12,3 +12,5 @@ Pillow
 nvidia-ml-py
 ultralytics
 pynvml
+streamlit
+pandas
