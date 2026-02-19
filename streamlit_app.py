@@ -7,6 +7,8 @@ from PIL import Image
 from torchvision import transforms
 import os
 import sys
+import cv2
+
 
 # Add repo root to path
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -50,23 +52,21 @@ SPLIT_RATIOS = {
     '60% Train / 20% Val / 20% Test': '60_20_20',
     '65% Train / 18% Val / 18% Test': '65_18_18',
     '70% Train / 15% Val / 15% Test': '70_15_15',
-    '70% Train / 30% Test': '70_30',
-    '80% Train / 20% Test': '80_20',
-    '90% Train / 10% Test': '90_10'
 }
 
 IMAGE_SIZE = 224
 FEATURE_DIM = 1024
 EMBEDDING_DIM = 2048
-THRESHOLD = 0.0094
+THRESHOLD = 0.5
+BASELINE_THRESHOLD = 0.5
 
 
 # ==========================================
 # MODEL LOADING (with caching)
 # ==========================================
 @st.cache_resource
-def load_models(dataset_name, split_ratio):
-    """Load feature extractor and metric generator models."""
+def load_proposed_models(dataset_name, split_ratio):
+    """Load feature extractor and metric generator models (proposed)."""
     try:
         # Set up checkpoint path
         checkpoint_dir = os.path.join(REPO_ROOT, 'checkpoints', 'proposed_splits', 
@@ -91,9 +91,7 @@ def load_models(dataset_name, split_ratio):
         
         # Load metric generator (MLP)
         metric_generator = MetricGenerator(
-            embedding_dim=EMBEDDING_DIM,
-            hidden_dim=256,
-            dropout=0.3
+            embedding_dim=EMBEDDING_DIM
         )
         
         # Load the full checkpoint
@@ -131,20 +129,82 @@ def load_models(dataset_name, split_ratio):
         return None, None, str(e)
 
 
+@st.cache_resource
+def load_baseline_model(dataset_name, split_ratio):
+    """Load baseline DenseNet classifier model."""
+    try:
+        checkpoint_name = f"best_{dataset_name}_{split_ratio}.pth"
+        checkpoint_path = os.path.join(REPO_ROOT, 'checkpoints', 'baseline_splits', checkpoint_name)
+
+        if not os.path.exists(checkpoint_path):
+            return None, f"Checkpoint not found at {checkpoint_path}"
+
+        baseline_model = DenseNetFeatureExtractor(
+            backbone_name='densenet121',
+            output_dim=2,
+            pretrained=True,
+            baseline=True
+        )
+
+        checkpoint = torch.load(checkpoint_path, map_location=DEVICE, weights_only=False)
+        state = checkpoint.get('model_state_dict', checkpoint) if isinstance(checkpoint, dict) else checkpoint
+
+        try:
+            baseline_model.load_state_dict(state, strict=True)
+        except RuntimeError:
+            model_state = baseline_model.state_dict()
+            filtered = {k: v for k, v in state.items()
+                        if k in model_state and model_state[k].shape == v.shape}
+            model_state.update(filtered)
+            baseline_model.load_state_dict(model_state)
+
+        baseline_model = baseline_model.to(DEVICE)
+        baseline_model.eval()
+
+        return baseline_model, None
+
+    except Exception as e:
+        return None, str(e)
+
+
 # ==========================================
 # IMAGE PROCESSING
 # ==========================================
 def preprocess_image(image: Image.Image) -> torch.Tensor:
     # Use RGB conversion to match .convert('RGB') in your TripletDataset
-    image = image.convert('RGB') 
-    
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], 
-                             std=[0.229, 0.224, 0.225])
-    ])
-    return transform(image).unsqueeze(0).to(DEVICE)
+    if image is None:
+            raise ValueError("No image provided")
+
+    # PIL -> numpy (RGB)
+    if isinstance(image, Image.Image):
+        img = np.array(image.convert("RGB"))
+    else:
+        img = image
+
+    # RGB -> gray
+    img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+    # Otsu binarization
+    _, thresh = cv2.threshold(
+        img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+
+    # invert
+    img_inv = cv2.bitwise_not(thresh)
+
+    # resize
+    img_resized = cv2.resize(img_inv, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_AREA)
+
+    # gray -> rgb
+    img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_GRAY2RGB)
+
+    # to float32 [0,1]
+    img_rgb = img_rgb.astype("float32") / 255.0
+
+    # numpy HWC -> torch CHW
+    tensor = torch.from_numpy(img_rgb).permute(2, 0, 1).unsqueeze(0).to(DEVICE)
+
+    return tensor
 
 
 # ==========================================
@@ -160,42 +220,15 @@ def extract_features(image: Image.Image, feature_extractor) -> torch.Tensor:
     return features.squeeze(0)  # Remove batch dimension
 
 
-def compute_similarity(feat1: torch.Tensor, feat2: torch.Tensor, 
-                      metric_generator) -> float:
-    """Compute similarity score between two feature vectors using the metric generator."""
-    # Concatenate features
-    combined = torch.cat([feat1, feat2], dim=0).unsqueeze(0)  # [1, 2048]
-    
-    with torch.no_grad():
-        logit = metric_generator(combined)
-    
-    # Apply sigmoid to convert logit to probability
-    score = torch.sigmoid(logit).item()
-    
-    return score
+def predict_baseline_probability(image: Image.Image, baseline_model) -> float:
+    """Predict genuine probability using the baseline classifier."""
+    tensor = preprocess_image(image)
 
-
-def verify_signature_prototype(test_features, prototype_features, metric_generator):
-    """
-    Implements the Relation Network logic: 
-    Score = g(Concat(Prototype, Query))
-    """
-    # Concatenate according to embedding_dim=2048 (1024 + 1024)
-    # Ensure shape is [1, 2048] for the Linear layer in MetricGenerator
-    combined = torch.cat([prototype_features, test_features], dim=0).unsqueeze(0)
-    
     with torch.no_grad():
-        logit = metric_generator(combined)
-        # Use sigmoid as done in your notebook's meta_validate function
-        score = torch.sigmoid(logit).item() 
-    
-    prediction = "🟢 GENUINE" if score >= THRESHOLD else "🔴 FORGED"
-    
-    # Simple confidence metric relative to your decision threshold
-    conf = abs(score - THRESHOLD) / max(THRESHOLD, 1 - THRESHOLD)
-    conf = min(conf, 1.0) * 100
-    
-    return score, prediction, conf
+        logits = baseline_model(tensor)
+        probs = torch.softmax(logits, dim=1)
+        return probs[0, 1].item()
+
 
 
 # ==========================================
@@ -231,6 +264,14 @@ st.sidebar.markdown(f"""
 - **Embedding Dimension**: 2048
 """)
 
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📘 Baseline Model")
+st.sidebar.markdown("""
+- **Backbone**: DenseNet-121 (no CBAM)
+- **Head**: 2-class classifier
+- **Score**: Softmax probability (genuine)
+""")
+
 # ==========================================
 # MAIN APPLICATION
 # ==========================================
@@ -240,24 +281,28 @@ st.markdown("---")
 dataset_name = DATASETS[selected_dataset]
 split_ratio = SPLIT_RATIOS[selected_split]
 
-with st.spinner(f"Loading model for {selected_dataset} ({selected_split})..."):
-    feature_extractor, metric_generator, error = load_models(dataset_name, split_ratio)
+with st.spinner(f"Loading models for {selected_dataset} ({selected_split})..."):
+    feature_extractor, metric_generator, error = load_proposed_models(dataset_name, split_ratio)
+    baseline_model, baseline_error = load_baseline_model(dataset_name, split_ratio)
 
 if error:
-    st.error(f"❌ Failed to load model: {error}")
+    st.error(f"Failed to load proposed model: {error}")
     st.stop()
 
-st.success("✅ Model loaded successfully!")
+if baseline_error:
+    st.warning(f"Baseline model unavailable: {baseline_error}")
+
+st.success("Model loaded successfully!")
 
 # Create two columns for instructions
 col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.markdown("### 👤 Reference Signatures")
+    st.markdown("### Reference Signatures")
     st.markdown("Upload 3 **genuine** reference signatures from the same person")
 
 with col2:
-    st.markdown("### 🔍 Test Signature")
+    st.markdown("### Test Signature")
     st.markdown("Upload 1 signature to verify (genuine or forged)")
 
 # Create file upload columns
@@ -271,7 +316,7 @@ with col1:
                             key='ref1', label_visibility='collapsed')
     if ref1:
         ref_images.append(Image.open(ref1))
-        st.image(ref1, use_column_width=True)
+        st.image(ref1, width='content')
 
 with col2:
     st.markdown("**Reference 2**")
@@ -279,7 +324,7 @@ with col2:
                             key='ref2', label_visibility='collapsed')
     if ref2:
         ref_images.append(Image.open(ref2))
-        st.image(ref2, use_column_width=True)
+        st.image(ref2, width='content')
 
 with col3:
     st.markdown("**Reference 3**")
@@ -287,51 +332,83 @@ with col3:
                             key='ref3', label_visibility='collapsed')
     if ref3:
         ref_images.append(Image.open(ref3))
-        st.image(ref3, use_column_width=True)
+        st.image(ref3, width='content')
 
 with col4:
     st.markdown("**Test Signature**")
     test_img = st.file_uploader("Upload test signature", type=['jpg', 'png', 'jpeg'],
                                key='test', label_visibility='collapsed')
     if test_img:
-        st.image(test_img, use_column_width=True)
+        st.image(test_img, width='content')
 
 # ==========================================
 # PREDICTION
 # ==========================================
 st.markdown("---")
 
-if st.button("🚀 Verify Signature", type="primary", use_container_width=True):
+if st.button("Verify Signature", type="primary", width='stretch'):
     
     # Validation
     if len(ref_images) < 3:
-        st.error("❌ Please upload all 3 reference signatures")
+        st.error("Please upload all 3 reference signatures")
     elif test_img is None:
-        st.error("❌ Please upload a test signature")
+        st.error("Please upload a test signature")
     else:
-        with st.spinner("Processing signatures and creating prototype..."):
+        with st.spinner("Processing signatures and computing individual scores..."):
             try:
                 # 1. Extract features for Test Image
                 test_image = Image.open(test_img)
                 test_features = extract_features(test_image, feature_extractor) # [1024]
                 
-                # 2. Extract and Aggregate features for References
+                # 2. Extract features for each Reference Image
                 reference_features_tensors = []
                 for ref_img in ref_images:
                     feat = extract_features(ref_img, feature_extractor)
                     reference_features_tensors.append(feat)
                 
-                # RESEARCH MATCH: Create a single 'Prototype' by averaging reference embeddings
-                # This matches how K-shot (K=3) is conceptually handled in Relation Networks
-                all_refs_stack = torch.stack(reference_features_tensors) # [3, 1024]
-                prototype_features = torch.mean(all_refs_stack, dim=0)   # [1024]
+                # 3. Compute individual similarity scores: each reference vs test
+                logits = []
+                probabilities = []
+
+                for idx, ref_feat in enumerate(reference_features_tensors):
+                    combined = torch.cat([ref_feat, test_features], dim=0).unsqueeze(0)
+
+                    with torch.no_grad():
+                        logit = metric_generator(combined)
+                        logits.append(logit.item())
+
+                        prob = torch.sigmoid(logit).item()
+                        probabilities.append(prob)
+
+                # ==========================
+                # Average LOGITS first
+                # ==========================
+                avg_logit = np.mean(logits)
+
+                # Convert averaged logit to probability
+                final_score = 1 / (1 + np.exp(-avg_logit))
+
+                # Keep individual probabilities for display
+                ind_scores = probabilities
                 
-                # 3. Verify signature using the Prototype vs Test
-                # We now unpack 3 values to match the updated function below
-                final_score, prediction, confidence = verify_signature_prototype(
-                    test_features, prototype_features, metric_generator
-                )
+                # Determine prediction and confidence
+                if final_score >= THRESHOLD:
+                    prediction = "GENUINE"
+                else:
+                    prediction = "FORGED"
                 
+                # Confidence: how far from threshold
+                confidence = abs(final_score - THRESHOLD)
+                confidence = min(confidence / 0.5, 1.0) * 100
+
+                
+                baseline_score = None
+                if baseline_model is not None:
+                    baseline_score = predict_baseline_probability(test_image, baseline_model)
+                    baseline_prediction = "GENUINE" if baseline_score >= BASELINE_THRESHOLD else "FORGED"
+                    baseline_confidence = abs(baseline_score - BASELINE_THRESHOLD)
+                    baseline_confidence = min(baseline_confidence / 0.5, 1.0) * 100
+
                 # Display results
                 st.markdown("---")
                 st.markdown("## 📋 Verification Results")
@@ -350,6 +427,24 @@ if st.button("🚀 Verify Signature", type="primary", use_container_width=True):
                     ### Confidence
                     # {confidence:.2f}%
                     """)
+
+                if baseline_score is not None:
+                    st.markdown("---")
+                    st.markdown("### Baseline Model Result")
+                    st.caption("Baseline score is computed from the test signature only.")
+                    base_col1, base_col2 = st.columns(2)
+
+                    with base_col1:
+                        st.markdown(f"""
+                        ### Prediction
+                        # {baseline_prediction}
+                        """)
+
+                    with base_col2:
+                        st.markdown(f"""
+                        ### Confidence
+                        # {baseline_confidence:.2f}%
+                        """)
                 
                 # Detailed scores
                 st.markdown("### Individual Similarity Scores")
@@ -377,6 +472,21 @@ if st.button("🚀 Verify Signature", type="primary", use_container_width=True):
                 with col3:
                     decision = "✅ MATCH" if final_score >= THRESHOLD else "❌ NO MATCH"
                     st.metric("Final Decision", decision)
+
+                if baseline_score is not None:
+                    st.markdown("---")
+                    base_metric_col1, base_metric_col2, base_metric_col3 = st.columns(3)
+
+                    with base_metric_col1:
+                        st.metric("Baseline Genuine Prob", f"{baseline_score:.4f}",
+                                  delta=f"{(baseline_score - BASELINE_THRESHOLD)*100:.2f}%")
+
+                    with base_metric_col2:
+                        st.metric("Baseline Threshold", f"{BASELINE_THRESHOLD:.4f}")
+
+                    with base_metric_col3:
+                        base_decision = "✅ MATCH" if baseline_score >= BASELINE_THRESHOLD else "❌ NO MATCH"
+                        st.metric("Baseline Decision", base_decision)
                 
                 # Score visualization
                 st.markdown("---")
@@ -419,18 +529,32 @@ st.markdown("---")
 st.markdown("""
 ### ℹ️ About This Application
 This signature verification system uses a state-of-the-art deep learning approach combining:
-- **Triplet Loss** for feature learning
-- **Meta-Learning** for few-shot adaptation
-- **Learnable Metric** (MLP) for similarity computation
+- **Triplet Loss** for feature learning during pretraining
+- **Meta-Learning (Episodic)** for few-shot adaptation
+- **Learnable Metric** (MLP) for similarity computation via Relation Network
 - **CBAM Attention** for feature refinement
+
+**Verification Process:**
+1. Extract feature embeddings from reference signatures using DenseNet-121 backbone
+2. Extract feature embedding from test signature
+3. Compute individual similarity scores: each reference vs test signature
+4. Average scores to determine final verdict (genuine or forged)
+
+**Model Training:**
+- Pretraining: Triplet loss on combined training data
+- Meta-Training: Episodic learning with relation network on validation data
+- Evaluation: Tested on held-out test set
 
 The model is trained on offline signature datasets (BHSig-Bengali, BHSig-Hindi, CEDAR) 
 and achieves high accuracy in distinguishing genuine signatures from skilled forgeries.
 
 **Model Details:**
-- Feature Extractor: DenseNet-121 with CBAM
-- Metric Generator: 2-layer MLP with LayerNorm
-- Training: 2-stage (pretraining with triplet loss + meta-learning with relation loss)
+- Feature Extractor: DenseNet-121 with CBAM attention modules
+- Metric Generator: 2-layer MLP with LayerNorm (episodic relation network)
+- Input: 224×224 RGB signature images
+- Feature Dimension: 1024 per signature
+- Metric Embedding: 2048 (concatenated pair)
+- Decision Threshold: Adaptive per dataset/split ratio
 """)
 st.markdown("---")
 st.markdown("*Developed for Research in Offline Signature Verification*")
