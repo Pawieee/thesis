@@ -45,7 +45,8 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DATASETS = {
     'BHSig-Bengali': 'bhsig_bengali',
     'BHSig-Hindi': 'bhsig_hindi',
-    'CEDAR': 'cedar'
+    'CEDAR': 'cedar',
+    'Combined (All Datasets)': 'combined'
 }
 
 SPLIT_RATIOS = {
@@ -57,7 +58,7 @@ SPLIT_RATIOS = {
 IMAGE_SIZE = 224
 FEATURE_DIM = 1024
 EMBEDDING_DIM = 2048
-THRESHOLD = 0.5
+THRESHOLD = 0.54
 BASELINE_THRESHOLD = 0.5
 
 
@@ -366,39 +367,36 @@ if st.button("Verify Signature", type="primary", width='stretch'):
                     feat = extract_features(ref_img, feature_extractor)
                     reference_features_tensors.append(feat)
                 
-                # 3. Compute individual similarity scores: each reference vs test
+                # 3. Compute per-reference forged probabilities (K=1 trials)
                 logits = []
-                probabilities = []
+                prob_genuine = []
+                prob_forged = []
 
-                for idx, ref_feat in enumerate(reference_features_tensors):
+                for ref_feat in reference_features_tensors:
                     combined = torch.cat([ref_feat, test_features], dim=0).unsqueeze(0)
 
                     with torch.no_grad():
                         logit = metric_generator(combined)
                         logits.append(logit.item())
 
-                        prob = torch.sigmoid(logit).item()
-                        probabilities.append(prob)
+                        p_genuine = torch.sigmoid(logit).item()
+                        p_forged = 1.0 - p_genuine
+                        prob_genuine.append(p_genuine)
+                        prob_forged.append(p_forged)
 
-                # ==========================
-                # Average LOGITS first
-                # ==========================
-                avg_logit = np.mean(logits)
+                # Per-reference decisions using the same threshold as test phase
+                ref_decisions = ["FORGED" if p >= THRESHOLD else "GENUINE" for p in prob_forged]
+                forged_votes = sum(1 for d in ref_decisions if d == "FORGED")
+                genuine_votes = len(ref_decisions) - forged_votes
 
-                # Convert averaged logit to probability
-                final_score = 1 / (1 + np.exp(-avg_logit))
+                # Majority vote (2 out of 3)
+                prediction = "FORGED" if forged_votes >= 2 else "GENUINE"
 
-                # Keep individual probabilities for display
-                ind_scores = probabilities
-                
-                # Determine prediction and confidence
-                if final_score >= THRESHOLD:
-                    prediction = "GENUINE"
-                else:
-                    prediction = "FORGED"
-                
-                # Confidence: how far from threshold
-                confidence = abs(final_score - THRESHOLD)
+                # Optional mean forged score for display
+                mean_forged_score = float(np.mean(prob_forged))
+
+                # Confidence: distance of mean forged score from threshold
+                confidence = abs(mean_forged_score - THRESHOLD)
                 confidence = min(confidence / 0.5, 1.0) * 100
 
                 
@@ -447,31 +445,33 @@ if st.button("Verify Signature", type="primary", width='stretch'):
                         """)
                 
                 # Detailed scores
-                st.markdown("### Individual Similarity Scores")
+                st.markdown("### Per-Reference Forged Scores (K=1)")
                 score_data = {
                     'Reference': ['Reference 1', 'Reference 2', 'Reference 3'],
-                    'Similarity Score': [f"{s:.4f}" for s in ind_scores],
-                    'Match %': [f"{s*100:.2f}%" for s in ind_scores]
+                    'P(Forged)': [f"{s:.4f}" for s in prob_forged],
+                    'Decision': ref_decisions,
+                    'P(Forged) %': [f"{s*100:.2f}%" for s in prob_forged]
                 }
                 
                 import pandas as pd
                 df = pd.DataFrame(score_data)
                 st.dataframe(df, use_container_width=True, hide_index=True)
                 
-                # Final average score
+                # Vote summary and mean score
                 st.markdown("---")
                 col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    st.metric("Average Similarity", f"{final_score:.4f}", 
-                             delta=f"{(final_score - THRESHOLD)*100:.2f}%")
+                    st.metric("Mean P(Forged)", f"{mean_forged_score:.4f}", 
+                             delta=f"{(mean_forged_score - THRESHOLD)*100:.2f}%")
                 
                 with col2:
                     st.metric("Decision Threshold", f"{THRESHOLD:.4f}")
                 
                 with col3:
-                    decision = "✅ MATCH" if final_score >= THRESHOLD else "❌ NO MATCH"
-                    st.metric("Final Decision", decision)
+                    vote_summary = f"{forged_votes} Forged / {genuine_votes} Genuine"
+                    decision = "❌ NO MATCH" if prediction == "FORGED" else "✅ MATCH"
+                    st.metric("Final Decision", decision, delta=vote_summary)
 
                 if baseline_score is not None:
                     st.markdown("---")
@@ -496,22 +496,22 @@ if st.button("Verify Signature", type="primary", width='stretch'):
                 
                 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
                 
-                # Bar chart for individual scores
-                ax1.bar(range(1, 4), ind_scores, color=['#1f77b4', '#ff7f0e', '#2ca02c'])
+                # Bar chart for per-reference forged scores
+                ax1.bar(range(1, 4), prob_forged, color=['#1f77b4', '#ff7f0e', '#2ca02c'])
                 ax1.axhline(y=THRESHOLD, color='r', linestyle='--', label=f'Threshold ({THRESHOLD:.4f})')
                 ax1.set_xlabel('Reference Signature')
-                ax1.set_ylabel('Similarity Score')
-                ax1.set_title('Similarity Scores vs References')
+                ax1.set_ylabel('P(Forged)')
+                ax1.set_title('Per-Reference Forged Scores')
                 ax1.set_ylim([0, 1])
                 ax1.legend()
                 ax1.grid(axis='y', alpha=0.3)
                 
-                # Gauge chart showing final score
-                ax2.barh(['Final\nScore'], [final_score], color='#1f77b4', height=0.4)
+                # Gauge chart showing mean forged score
+                ax2.barh(['Mean\nP(Forged)'], [mean_forged_score], color='#1f77b4', height=0.4)
                 ax2.axvline(x=THRESHOLD, color='r', linestyle='--', linewidth=2, label='Threshold')
                 ax2.set_xlim([0, 1])
-                ax2.set_xlabel('Similarity Score')
-                ax2.set_title('Final Verification Score')
+                ax2.set_xlabel('P(Forged)')
+                ax2.set_title('Mean Forged Score')
                 ax2.legend()
                 ax2.grid(axis='x', alpha=0.3)
                 
