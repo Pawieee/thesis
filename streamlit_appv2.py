@@ -369,11 +369,11 @@ if st.button("🔍 Verify Signature (K=1 Protocol)", type="primary", use_contain
                 score_col1, score_col2, score_col3 = st.columns(3)
                 
                 with score_col1:
-                    st.metric("P(Genuine)", f"{prob_genuine:.4f}", 
+                    st.metric("P(Forged)", f"{prob_genuine:.4f}", 
                              delta=f"{(prob_forged - threshold)*100:.2f}% (P(Forged) vs threshold)")
                 
                 with score_col2:
-                    st.metric("P(Forged)", f"{prob_forged:.4f}")
+                    st.metric("P(Genuine)", f"{prob_forged:.4f}")
                 
                 with score_col3:
                     st.metric("Decision Threshold", f"{threshold:.4f}")
