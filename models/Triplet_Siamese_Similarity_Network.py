@@ -13,7 +13,7 @@ class tDCBAM(nn.Module):
     In the meta-learning phase, the feature_extractor is used directly,
     and the metric generation is handled separately by the MetricGenerator.
     """
-    def __init__(self, backbone_name='densenet121', output_dim=1024, pretrained=True):
+    def __init__(self, backbone_name='densenet121', output_dim=1024, pretrained=True, baseline=False):
         """
         Initializes the tDCBAM model.
 
@@ -30,7 +30,8 @@ class tDCBAM(nn.Module):
         self.feature_extractor = DenseNetFeatureExtractor(
             backbone_name=backbone_name,
             output_dim=output_dim,
-            pretrained=pretrained
+            pretrained=pretrained,
+            baseline=baseline
         )
 
     def forward(self, anchor, positive, negative):
