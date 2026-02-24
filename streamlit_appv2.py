@@ -431,7 +431,14 @@ if st.button("🔍 Verify Signature (K=1 Protocol)", type="primary", use_contain
                 avg_prob_genuine = float(np.mean([item["p_genuine"] for item in per_support]))
                 avg_prob_forged = 1.0 - avg_prob_genuine
 
-                vote_confidence_pct = (max(genuine_votes, forged_votes) / 3.0) * 100
+                # Calculate confidence based on average probability distance from threshold
+                # Normalize by maximum possible distance from threshold
+                if avg_prob_genuine >= threshold:
+                    # Predicted GENUINE: distance from threshold towards 1.0
+                    vote_confidence_pct = ((avg_prob_genuine - threshold) / (1.0 - threshold)) * 100
+                else:
+                    # Predicted FORGED: distance from threshold towards 0.0
+                    vote_confidence_pct = ((threshold - avg_prob_genuine) / threshold) * 100
                 
                 # Display results
                 st.markdown("---")
@@ -448,7 +455,7 @@ if st.button("🔍 Verify Signature (K=1 Protocol)", type="primary", use_contain
                 
                 with result_col2:
                     st.markdown(f"""
-                    ### Vote Confidence
+                    ### Confidence
                     # {vote_confidence_pct:.2f}%
                     """)
                 
@@ -576,8 +583,14 @@ if st.button("🔍 Verify Signature (K=1 Protocol)", type="primary", use_contain
                     end_time_baseline = time.time()
                     processing_time_baseline = end_time_baseline - start_time_baseline
 
-                    base_confidence = abs(base_p_genuine - baseline_threshold)
-                    base_confidence_pct = min(base_confidence / 0.5, 1.0) * 100
+                    # Calculate confidence based on probability distance from learned threshold
+                    # Normalize by maximum possible distance from threshold
+                    if base_p_genuine >= baseline_threshold:
+                        # Predicted GENUINE: distance from threshold towards 1.0
+                        base_confidence_pct = ((base_p_genuine - baseline_threshold) / (1.0 - baseline_threshold)) * 100
+                    else:
+                        # Predicted FORGED: distance from threshold towards 0.0
+                        base_confidence_pct = ((baseline_threshold - base_p_genuine) / baseline_threshold) * 100
 
                     base_col1, base_col2, base_col3, base_col4 = st.columns(4)
 
