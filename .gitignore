@@ -46,11 +46,9 @@ model-training/.venv/
 */.ipynb_checkpoints/*
 
 # --- Data and Logs ---
-# It's usually best to keep large data out of Git
 data/
 *.log
 
 # --- Environment Variables ---
-# NEVER commit your secrets/API keys
 .env
 .venv
