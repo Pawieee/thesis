@@ -1029,7 +1029,7 @@ export default function App() {
                   >
                     {loading
                       ? <><span style={{width:17,height:17,display:'inline-block'}}>{Ic.loader}</span> Analyzing…</>
-                      : <><span style={{width:17,height:17,display:'inline-block'}}>{Ic.shield}</span> Run Verification Protocol</>
+                      : <><span style={{width:17,height:17,display:'inline-block'}}>{Ic.shield}</span> Run Verification</>
                     }
                   </button>
 
