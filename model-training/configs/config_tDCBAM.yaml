@@ -1,0 +1,29 @@
+# Configuration for Triplet
+# When training, it should be loaded from here, not created outside, editing parameters or sizes should also go here
+
+model:
+  name: tDCBAM      
+  backbone: densenet121
+  feature_dim: 1024  # DenseNet121 outputs 1024 dimensions (not 512)
+  
+training:
+  batch_size: 64               # Number of images in each batch
+  learning_rate: 1e-4         # Optimizer learning rate
+  early_stop: 3
+  optimizer: adam              # Optimizer usage
+  num_epochs: 50              # Number of train epochs
+  margin: 0.6                  # Margin cho triplet loss (threshold)
+  scheduler: cosine            # Add scheduler to gradually reduce learning rate
+
+
+dataset:
+  train_data_path: ./data/triplet/train/ # Change here to load dataset
+  val_data_path: ./data/triplet/val/     # Change here to load dataset
+  input_size: (220,150)                  # Input image size (resize), probably use cv2, x= 220, y = 150
+
+device: cuda                             # Use GPU (CUDA)
+
+logging:
+  log_dir: ./logs/                       # Add log folder
+  checkpoint_dir: ./checkpoints/         # Add checkpoint model storage folder
+  save_freq: 5                           # Save checkpoint every 5 epochs
