@@ -496,7 +496,7 @@ function VoteDots({ perSupport }) {
               <span style={{ width:18, height:18, display:'block' }}>{isG?Ic.check:Ic.alert}</span>
             </div>
             <span style={{ fontFamily:FONT, fontWeight:600, fontSize:12, color:isG?C.green:C.red }}>{s.support}</span>
-            <span style={{ fontFamily:FONT_MONO, fontSize:11, color:C.textMid }}>P(G)={s.p_genuine.toFixed(3)}</span>
+            <span style={{ fontFamily:FONT_MONO, fontSize:11, color:C.textMid }}>P(G)={(s.p_genuine * 100).toFixed(2)}</span>
           </div>
         );
       })}
@@ -541,9 +541,9 @@ function ProposedPanel({ data }) {
         {/* Stats */}
         <Divider label="Probability Scores" />
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:9, marginBottom:4 }}>
-          <StatBox label="Avg P(Genuine)"  value={data.avg_p_genuine.toFixed(4)} mono valueColor={C.green} />
-          <StatBox label="Avg P(Forged)"   value={data.avg_p_forged.toFixed(4)}  mono valueColor={C.red}   />
-          <StatBox label="Threshold (θ)"   value={data.threshold.toFixed(4)}     mono valueColor={C.blue}  />
+          <StatBox label="Avg P(Genuine)"  value={(data.avg_p_genuine * 100).toFixed(2)} mono valueColor={C.green} />
+          <StatBox label="Avg P(Forged)"   value={(data.avg_p_forged * 100).toFixed(2)}  mono valueColor={C.red}   />
+          <StatBox label="Threshold (θ)"   value={(data.threshold * 100).toFixed(2)}     mono valueColor={C.blue}  />
           <StatBox label="Vote Tally"      value={`${data.per_support?.filter(s=>s.prediction==='GENUINE').length ?? '—'}/3`} mono />
         </div>
 
@@ -573,8 +573,8 @@ function ProposedPanel({ data }) {
               {data.per_support.map((s,i) => (
                 <tr key={i} style={{ borderBottom:`1px solid ${C.borderLight}`, background:i%2?C.surfaceAlt:C.surface }}>
                   <td style={{ padding:'9px 14px', fontFamily:FONT, fontWeight:600, fontSize:12, color:C.navy }}>{s.support}</td>
-                  <td style={{ padding:'9px 14px', fontFamily:FONT_MONO, fontSize:12, color:C.green }}>{s.p_genuine.toFixed(4)}</td>
-                  <td style={{ padding:'9px 14px', fontFamily:FONT_MONO, fontSize:12, color:C.red   }}>{s.p_forged.toFixed(4)}</td>
+                  <td style={{ padding:'9px 14px', fontFamily:FONT_MONO, fontSize:12, color:C.green }}>{(s.p_genuine * 100).toFixed(2)}</td>
+                  <td style={{ padding:'9px 14px', fontFamily:FONT_MONO, fontSize:12, color:C.red   }}>{(s.p_forged * 100).toFixed(2)}</td>
                   <td style={{ padding:'9px 14px' }}><Badge color={s.prediction==='GENUINE'?'green':'red'}>{s.prediction}</Badge></td>
                 </tr>
               ))}
@@ -596,7 +596,7 @@ function ProposedPanel({ data }) {
               ['Operation','concat [support, query]'],
               ['MLP Output','Logit → Sigmoid'],
               ['Final Output','P(Genuine) ∈ [0, 1]'],
-              ['Decision Rule',`P(G) ≥ ${data.threshold.toFixed(4)} → GENUINE`],
+              ['Decision Rule',`P(G) ≥ ${(data.threshold * 100).toFixed(2)} → GENUINE`],
             ]},
           ].map(({ title, rows }) => (
             <div key={title} style={{ background:C.surfaceAlt, border:`1px solid ${C.border}`, borderRadius:8, padding:'12px 14px' }}>
@@ -639,7 +639,7 @@ function BaselinePanel({ data, proposedData }) {
         </div>
         <div style={{ textAlign:'right' }}>
           <div style={{ fontFamily:FONT, fontSize:11, color:isG?C.green:C.red, marginBottom:2 }}>Confidence</div>
-          <div style={{ fontFamily:FONT_MONO, fontSize:24, fontWeight:700, color:isG?C.green:C.red }}>{data.confidence.toFixed(1)}%</div>
+          <div style={{ fontFamily:FONT_MONO, fontSize:24, fontWeight:700, color:isG?C.green:C.red }}>{data.confidence.toFixed(2)}%</div>
         </div>
       </div>
 
@@ -650,10 +650,10 @@ function BaselinePanel({ data, proposedData }) {
 
         {/* Stats */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:9, marginBottom:4 }}>
-          <StatBox label="Verdict"    value={data.prediction}           mono={false} valueColor={isG?C.green:C.red} />
-          <StatBox label="P(Genuine)" value={data.p_genuine.toFixed(4)} mono valueColor={C.green} />
-          <StatBox label="P(Forged)"  value={data.p_forged.toFixed(4)}  mono valueColor={C.red}   />
-          <StatBox label="Confidence" value={`${data.confidence.toFixed(1)}%`} mono />
+          <StatBox label="Verdict"    value={data.prediction}                        mono={false} valueColor={isG?C.green:C.red} />
+          <StatBox label="P(Genuine)" value={(data.p_genuine * 100).toFixed(2)}       mono valueColor={C.green} />
+          <StatBox label="P(Forged)"  value={(data.p_forged * 100).toFixed(2)}        mono valueColor={C.red}   />
+          <StatBox label="Confidence" value={(data.confidence).toFixed(2) + '%'}      mono />
         </div>
 
         {/* Charts */}
@@ -676,9 +676,9 @@ function BaselinePanel({ data, proposedData }) {
             </thead>
             <tbody>
               {[
-                ['P(Genuine)',   data.p_genuine.toFixed(4),  `${((data.p_genuine-data.threshold)*100).toFixed(2)}%`],
-                ['P(Forged)',    data.p_forged.toFixed(4),   `${((data.p_forged-data.threshold)*100).toFixed(2)}%`],
-                ['Threshold θ', data.threshold.toFixed(4),  '—'],
+                ['P(Genuine)',   (data.p_genuine * 100).toFixed(2),   `${((data.p_genuine - data.threshold) * 100).toFixed(2)}`],
+                ['P(Forged)',    (data.p_forged * 100).toFixed(2),    `${((data.p_forged - data.threshold) * 100).toFixed(2)}`],
+                ['Threshold θ', (data.threshold * 100).toFixed(2),   '—'],
               ].map(([label,val,diff],i) => (
                 <tr key={label} style={{ borderBottom:`1px solid ${C.borderLight}`, background:i%2?C.surfaceAlt:C.surface }}>
                   <td style={{ padding:'9px 14px', fontFamily:FONT, fontWeight:500, fontSize:12, color:C.navy }}>{label}</td>
@@ -755,12 +755,12 @@ function ModelComparisonPanel({ proposed, baseline }) {
             </thead>
             <tbody>
               {[
-                ['Verdict',       proposed.prediction,                      baseline.prediction],
-                ['P(Genuine)',    proposed.avg_p_genuine.toFixed(4),        baseline.p_genuine.toFixed(4)],
-                ['P(Forged)',     proposed.avg_p_forged.toFixed(4),         baseline.p_forged.toFixed(4)],
-                ['Confidence',   `${proposed.vote_confidence}%`,           `${baseline.confidence.toFixed(1)}%`],
-                ['Threshold θ',  proposed.threshold.toFixed(4),            baseline.threshold.toFixed(4)],
-                ['Process Time', `${proposed.processing_time}s`,           `${baseline.processing_time}s`],
+                ['Verdict',       proposed.prediction,                              baseline.prediction],
+                ['P(Genuine)',    (proposed.avg_p_genuine * 100).toFixed(2),        (baseline.p_genuine * 100).toFixed(2)],
+                ['P(Forged)',     (proposed.avg_p_forged * 100).toFixed(2),         (baseline.p_forged * 100).toFixed(2)],
+                ['Confidence',   `${proposed.vote_confidence}%`,                   `${baseline.confidence.toFixed(2)}%`],
+                ['Threshold θ',  (proposed.threshold * 100).toFixed(2),            (baseline.threshold * 100).toFixed(2)],
+                ['Process Time', `${proposed.processing_time}s`,                   `${baseline.processing_time}s`],
               ].map(([label, pVal, bVal], i) => (
                 <tr key={label} style={{ borderBottom:`1px solid ${C.borderLight}`, background:i%2?C.surfaceAlt:C.surface }}>
                   <td style={{ padding:'9px 14px', fontFamily:FONT, fontWeight:500, fontSize:12, color:C.navy }}>{label}</td>

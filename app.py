@@ -95,17 +95,61 @@ def load_baseline_model(dataset_name: str, split_ratio: str):
     baseline_cache[cache_key] = (baseline_model, learned_threshold)
     return baseline_cache[cache_key]
 
-def preprocess_image(image_bytes: bytes) -> torch.Tensor:
-    img = np.array(Image.open(io.BytesIO(image_bytes)).convert("RGB"))
+def preprocess_image_with_steps(image_input) -> tuple[torch.Tensor, dict]:
+    """Processes image and returns the final tensor plus all intermediate steps."""
+    steps = {}
+    
+    # 1. Load
+    if isinstance(image_input, bytes):
+        image = Image.open(io.BytesIO(image_input)).convert("RGB")
+    else:
+        image = image_input.convert("RGB")
+    
+    img = np.array(image)
+    steps['1. Original'] = img
+    
+    # 2. Grayscale
     img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    steps['2. Grayscale'] = img_gray
+
+    # 3. Binarization
     _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     img_inv = cv2.bitwise_not(thresh)
-    img_resized = cv2.resize(img_inv, (IMAGE_SIZE, IMAGE_SIZE), interpolation=cv2.INTER_AREA)
-    img_rgb = cv2.cvtColor(img_resized, cv2.COLOR_GRAY2RGB)
+    steps['3. Binarized'] = img_inv
+
+    # 4. Tight Crop
+    coords = cv2.findNonZero(img_inv)
+    if coords is not None:
+        x, y, w, h = cv2.boundingRect(coords)
+        margin = 10
+        x_s, y_s = max(0, x-margin), max(0, y-margin)
+        w_e, h_e = min(img_inv.shape[1], x+w+margin), min(img_inv.shape[0], y+h+margin)
+        img_crop = img_inv[y_s:h_e, x_s:w_e]
+    else:
+        img_crop = img_inv
+    steps['4. Tight Crop'] = img_crop
+
+    # 5. Aspect-Aware Resize
+    h_c, w_c = img_crop.shape
+    scale = IMAGE_SIZE / max(h_c, w_c)
+    nw, nh = int(w_c * scale), int(h_c * scale)
+    img_resized = cv2.resize(img_crop, (nw, nh), interpolation=cv2.INTER_AREA)
+    steps['5. Resized'] = img_resized
+
+    # 6. Padding
+    canvas = np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.uint8)
+    y_off, x_off = (IMAGE_SIZE - nh) // 2, (IMAGE_SIZE - nw) // 2
+    canvas[y_off:y_off+nh, x_off:x_off+nw] = img_resized
+    steps['6. Final Canvas'] = canvas
+
+    # 7. Normalize
+    img_rgb = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
+    img_float = img_rgb.astype("float32") / 255.0
+    tensor = torch.from_numpy(img_float).permute(2, 0, 1)
+    norm_tensor = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(tensor)
     
-    tensor = torch.from_numpy(img_rgb.astype("float32") / 255.0).permute(2, 0, 1).to(DEVICE)
-    tensor = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(tensor)
-    return tensor.unsqueeze(0)
+    return norm_tensor.unsqueeze(0).to(DEVICE), steps
+
 
 @app.post("/verify")
 async def verify_signature(
@@ -121,13 +165,13 @@ async def verify_signature(
         f_extractor, m_generator, threshold = load_proposed_models(dataset, split)
         b_model, b_threshold = load_baseline_model(dataset, split)
 
-        # Preprocess Tensors
+        # Preprocess Tensors (We extract index [0] to get just the tensor, ignoring the steps dict)
         s_tensors = [
-            preprocess_image(await support_file_1.read()),
-            preprocess_image(await support_file_2.read()),
-            preprocess_image(await support_file_3.read())
+            preprocess_image_with_steps(await support_file_1.read())[0],
+            preprocess_image_with_steps(await support_file_2.read())[0],
+            preprocess_image_with_steps(await support_file_3.read())[0]
         ]
-        q_tensor = preprocess_image(await query_file.read())
+        q_tensor = preprocess_image_with_steps(await query_file.read())[0]
 
         # ================== PROPOSED MODEL (3x K=1) ==================
         t0_prop = time.time()
