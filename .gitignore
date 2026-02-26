@@ -1,12 +1,54 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+# Ignore local workspace settings (which contain your specific venv paths)
+.vscode/*
+# Allow shared project configurations
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+# Ignore Mac system files
+.DS_Store
 
-# Virtual environments
-.venv
-data/
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Virtual Environments ---
+# Handles common names like venv, .venv, or env
+venv/
+.venv/
+env/
+ENV/
+backend/venv/
+backend/.venv/
+model-training/venv/
+model-training/.venv/
+
+# --- Jupyter Notebooks ---
 .ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# --- Data and Logs ---
+data/
+*.log
+
+# --- Environment Variables ---
+.env
+.venv
