@@ -1,0 +1,41 @@
+{
+  "CEDAR (65:18:18)": {
+    "dataset": "CEDAR",
+    "split": "65:18:18",
+    "train_users": 35,
+    "val_users": 9,
+    "test_users": 11,
+    "eer": 0.0,
+    "accuracy": 1.0,
+    "auc": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "CEDAR (70:15:15)": {
+    "dataset": "CEDAR",
+    "split": "70:15:15",
+    "train_users": 38,
+    "val_users": 8,
+    "test_users": 9,
+    "eer": 0.032407407407407406,
+    "accuracy": 0.9837962962962963,
+    "auc": 0.9837962962962963,
+    "precision": 0.968609865470852,
+    "recall": 1.0,
+    "f1": 0.9840546697038725
+  },
+  "CEDAR (60:20:20)": {
+    "dataset": "CEDAR",
+    "split": "60:20:20",
+    "train_users": 33,
+    "val_users": 11,
+    "test_users": 11,
+    "eer": 0.0,
+    "accuracy": 1.0,
+    "auc": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  }
+}
