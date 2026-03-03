@@ -35,14 +35,18 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
 
    _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
    img_inv = cv2.bitwise_not(thresh)
-  
+
    if augment and random.random() < 0.5:
-    kernel = np.ones((2, 2), np.uint8)
-    
-    if random.random() < 0.25:                 
-        img_inv = cv2.erode(img_inv, kernel, iterations=1)
-    else:
+        kernel = np.ones((2, 2), np.uint8)
         img_inv = cv2.dilate(img_inv, kernel, iterations=1)
+  
+#    if augment and random.random() < 0.5:
+#     kernel = np.ones((2, 2), np.uint8)
+    
+#     if random.random() < 0.25:                 
+#         img_inv = cv2.erode(img_inv, kernel, iterations=1)
+#     else:
+#         img_inv = cv2.dilate(img_inv, kernel, iterations=1)
           
    coords = cv2.findNonZero(img_inv)
    if coords is not None:
