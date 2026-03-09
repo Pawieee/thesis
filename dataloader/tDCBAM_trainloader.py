@@ -1,4 +1,5 @@
 import os
+import re
 import random
 import torch
 import numpy as np
@@ -9,317 +10,321 @@ from torchvision import transforms
 
 
 # =============================================================================
-# TRANSFORMATION UTILITIES (AUGMENTATION STRATEGY)
+# PREPROCESSING & AUGMENTATION
 # =============================================================================
-
 
 def preprocess_image(img, img_size=(224, 224), augment=False):
-   """
-   Preprocess a signature image using grayscale, Otsu binarization,
-   inversion, optional morphological ops, tight cropping, aspect-aware resizing, and padding.
-   """
-   if img is None:
-       return None
+    """
+    Preprocesses a signature image through the full pipeline:
 
+    Pipeline (in order):
+        1. Convert to grayscale
+        2. Otsu binarization
+        3. Stroke inversion (strokes = white, background = black)
+        4. [Train only] Morphological augmentation (erode/dilate)
+        5. Tight crop with 10px margin
+        6. Aspect-aware resize preserving stroke proportions
+        7. Zero-padded centering onto 224x224 black canvas
+        8. [Train only] Geometric augmentation (rotation, translation, scale)
+           Applied AFTER canvas construction on the binary image.
+           Fill = 0 (black) to match background — NOT 255.
+        9. Convert grayscale canvas to 3-channel RGB (DenseNet compatibility)
+       10. Normalize with ImageNet statistics
 
-   if isinstance(img, Image.Image):
-       img = img.convert("RGB")
-       img = np.array(img)
+    Args:
+        img: PIL.Image or np.ndarray (RGB or grayscale)
+        img_size (tuple): Target canvas size. Default (224, 224).
+        augment (bool): Apply morphological + geometric augmentation.
+                        Must be False for validation and test.
 
+    Returns:
+        torch.Tensor: Normalized tensor of shape [3, H, W]
+        or None if input is None.
+    """
+    if img is None:
+        return None
 
-   if img.ndim == 3:
-       img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-   else:
-       img_gray = img
+    # --- 1. Ensure numpy RGB array ---
+    if isinstance(img, Image.Image):
+        img = img.convert("RGB")
+        img = np.array(img)
 
+    # --- 2. Grayscale conversion ---
+    if img.ndim == 3:
+        img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+    else:
+        img_gray = img.copy()
 
-   _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-   img_inv = cv2.bitwise_not(thresh)
-  
-   # NEW: Morphological operations applied ONLY if augment=True
-   if augment and random.random() < 0.5:
-       kernel_size = random.choice([2, 3])
-       kernel = np.ones((kernel_size, kernel_size), np.uint8)
-      
-       # 50% chance to Erode (thin), 50% chance to Dilate (thicken)
-       if random.random() < 0.5:
-           img_inv = cv2.erode(img_inv, kernel, iterations=1)
-       else:
-           img_inv = cv2.dilate(img_inv, kernel, iterations=1)
-          
-   coords = cv2.findNonZero(img_inv)
-   if coords is not None:
-       x, y, w, h = cv2.boundingRect(coords)
-       margin = 10
-       x_s, y_s = max(0, x - margin), max(0, y - margin)
-       w_e, h_e = min(img_inv.shape[1], x + w + margin), min(img_inv.shape[0], y + h + margin)
-       img_crop = img_inv[y_s:h_e, x_s:w_e]
-   else:
-       img_crop = img_inv
+    # --- 3. Otsu binarization + stroke inversion ---
+    # Result: strokes = 255 (white), background = 0 (black)
+    _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    img_inv = cv2.bitwise_not(thresh)
 
+    # --- 4. Morphological augmentation (training only) ---
+    # Randomly erodes (thins) or dilates (thickens) strokes to simulate
+    # natural pen pressure variation. Applied with p=0.5.
+    if augment and random.random() < 0.5:
+        kernel_size = random.choice([2, 3])
+        kernel = np.ones((kernel_size, kernel_size), np.uint8)
+        if random.random() < 0.5:
+            img_inv = cv2.erode(img_inv, kernel, iterations=1)
+        else:
+            img_inv = cv2.dilate(img_inv, kernel, iterations=1)
 
-   target_size = img_size[0]
-   h_c, w_c = img_crop.shape
-   scale = target_size / max(h_c, w_c)
-   nw, nh = int(w_c * scale), int(h_c * scale)
-  
-   if nw == 0 or nh == 0:
-       img_resized = cv2.resize(img_crop, img_size, interpolation=cv2.INTER_AREA)
-       nw, nh = img_size
-   else:
-       img_resized = cv2.resize(img_crop, (nw, nh), interpolation=cv2.INTER_AREA)
+    # --- 5. Tight crop with margin ---
+    coords = cv2.findNonZero(img_inv)
+    if coords is not None:
+        x, y, w, h = cv2.boundingRect(coords)
+        margin = 10
+        x_s = max(0, x - margin)
+        y_s = max(0, y - margin)
+        x_e = min(img_inv.shape[1], x + w + margin)
+        y_e = min(img_inv.shape[0], y + h + margin)
+        img_crop = img_inv[y_s:y_e, x_s:x_e]
+    else:
+        img_crop = img_inv
 
+    # --- 6. Aspect-aware resize ---
+    target_size = img_size[0]
+    h_c, w_c = img_crop.shape
+    scale = target_size / max(h_c, w_c)
+    nw = int(w_c * scale)
+    nh = int(h_c * scale)
 
-   canvas = np.zeros(img_size, dtype=np.uint8)
-   y_off, x_off = (target_size - nh) // 2, (target_size - nw) // 2
-   canvas[y_off:y_off+nh, x_off:x_off+nw] = img_resized
+    if nw == 0 or nh == 0:
+        img_resized = cv2.resize(img_crop, img_size, interpolation=cv2.INTER_AREA)
+        nw, nh = img_size[1], img_size[0]
+    else:
+        img_resized = cv2.resize(img_crop, (nw, nh), interpolation=cv2.INTER_AREA)
 
+    # --- 7. Zero-padded centering onto black canvas ---
+    # Background = 0 (black), strokes = 255 (white)
+    canvas = np.zeros(img_size, dtype=np.uint8)
+    y_off = (target_size - nh) // 2
+    x_off = (target_size - nw) // 2
+    canvas[y_off:y_off + nh, x_off:x_off + nw] = img_resized
 
-   img_rgb = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
-   img_float = img_rgb.astype("float32") / 255.0
-  
-   tensor = torch.from_numpy(img_float).permute(2, 0, 1)
-   norm_tensor = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])(tensor)
-  
-   return norm_tensor
+    # --- 8. Geometric augmentation on canvas (training only) ---
+    # Applied AFTER canvas construction on the binary image.
+    # fill=0 matches the black background — using fill=255 would
+    # paint empty regions white (same as strokes), corrupting boundaries.
+    #
+    # Parameters chosen for realism:
+    #   Rotation:    ±15°    (reduced from ±20° — extreme rotation is unrealistic)
+    #   Translation: ±10%    (reduced from ±20% — large shifts push strokes off-canvas)
+    #   Scale:       90-110% (tightened from 80-120% — extreme scale distorts proportions)
+    #
+    # NOTE: RandomHorizontalFlip is intentionally excluded.
+    # A horizontally flipped signature is not a valid real-world sample —
+    # no writer produces a mirror image of their own signature.
+    if augment:
+        h_canvas, w_canvas = canvas.shape
+        center = (w_canvas // 2, h_canvas // 2)
 
+        # Random rotation ±15°
+        angle = random.uniform(-15, 15)
 
-def get_pretraining_transforms(input_shape=(224, 224), preprocess=False, augment=True):
-   """
-   Generates a pre-training transform pipeline with optional preprocessing and augmentation.
-  
-   Args:
-       input_shape (tuple): Target input resolution (H, W). Default is (224, 224)
-       preprocess (bool): Apply grayscale + Otsu + inversion + resize before tensor conversion
-       augment (bool): Apply data augmentation (flip/rotation/affine)
-      
-   Returns:
-       torchvision.transforms.Compose: The composition of transforms.
-   """
-   transform_list = []
+        # Random scale 90–110%
+        scale_factor = random.uniform(0.90, 1.10)
 
+        # Rotation + scale matrix
+        M_rot = cv2.getRotationMatrix2D(center, angle, scale_factor)
 
-   if augment:
-       transform_list.extend([
-           transforms.RandomHorizontalFlip(p=0.5),
-           transforms.RandomRotation(degrees=20, fill=255),
-           transforms.RandomAffine(
-               degrees=0,
-               translate=(0.2, 0.2),
-               scale=(0.8, 1.2),
-               fill=255
-           ),
-       ])
+        # Random translation ±10% of canvas size
+        tx = random.uniform(-0.10, 0.10) * w_canvas
+        ty = random.uniform(-0.10, 0.10) * h_canvas
+        M_rot[0, 2] += tx
+        M_rot[1, 2] += ty
 
+        # Apply with BORDER_CONSTANT fill=0 (black background)
+        canvas = cv2.warpAffine(
+            canvas, M_rot, (w_canvas, h_canvas),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0
+        )
 
-   # --- UPDATED: Pass the augment flag into preprocess_image ---
-   if preprocess:
-       transform_list.append(transforms.Lambda(lambda img: preprocess_image(img, img_size=input_shape, augment=augment)))
-   else:
-       transform_list.append(transforms.Resize(input_shape))
-       transform_list.append(transforms.ToTensor())
-       transform_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+    # --- 9. Grayscale → RGB (DenseNet requires 3-channel input) ---
+    # All three channels are identical since the source is binary grayscale.
+    # This is necessary for ImageNet-pretrained DenseNet-121 compatibility.
+    img_rgb = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
 
+    # --- 10. Float conversion + ImageNet normalization ---
+    img_float = img_rgb.astype("float32") / 255.0
+    tensor = torch.from_numpy(img_float).permute(2, 0, 1)
+    norm_tensor = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225]
+    )(tensor)
 
-   return transforms.Compose(transform_list)
-
-
-def get_baseline_transforms(input_shape=(224, 224), preprocess=False, augment=True):
-   """
-   Generates baseline (classification) transform pipeline with optional preprocessing and augmentation.
-  
-   Args:
-       input_shape (tuple): Target input resolution (H, W). Default is (224, 224)
-       preprocess (bool): Apply grayscale + Otsu + inversion + resize before tensor conversion
-       augment (bool): Apply data augmentation (flip/rotation/affine)
-      
-   Returns:
-       torchvision.transforms.Compose: Training transforms
-       torchvision.transforms.Compose: Validation (no augment) transforms
-   """
-   train_list = []
-   val_list = []
-
-
-   if augment:
-       train_list.extend([
-           transforms.RandomHorizontalFlip(p=0.5),
-           transforms.RandomRotation(degrees=20, fill=255),
-           transforms.RandomAffine(degrees=0, translate=(0.2, 0.2), scale=(0.8, 1.2), fill=255),
-       ])
-
-
-   if preprocess:
-       train_list.append(transforms.Lambda(lambda img: preprocess_image(img, img_size=input_shape, augment=augment)))
-       val_list.append(transforms.Lambda(lambda img: preprocess_image(img, img_size=input_shape, augment=False)))
-   else:
-       train_list.append(transforms.Resize(input_shape))
-       train_list.append(transforms.ToTensor())
-       train_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
-
-
-       val_list.append(transforms.Resize(input_shape))
-       val_list.append(transforms.ToTensor())
-       val_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
-
-
-   return transforms.Compose(train_list), transforms.Compose(val_list)
+    return norm_tensor
 
 
 # =============================================================================
-# DATASET CLASS WITH HARD MINING
+# TRANSFORM FACTORY
 # =============================================================================
 
+def get_transforms(mode='train', input_shape=(224, 224), preprocess=True):
+    """
+    Returns the appropriate transform pipeline for a given mode.
+
+    Args:
+        mode (str): One of 'train', 'val', or 'test'.
+                    'train' applies augmentation.
+                    'val' and 'test' apply preprocessing only (no augmentation).
+        input_shape (tuple): Target image size. Default (224, 224).
+        preprocess (bool): If True, applies the full signature preprocessing
+                           pipeline via preprocess_image(). If False, applies
+                           standard resize + ToTensor + Normalize (for raw RGB
+                           pipelines that skip binarization). Default True.
+
+    Returns:
+        torchvision.transforms.Compose: The composed transform pipeline.
+
+    Example:
+        train_transform = get_transforms(mode='train')
+        val_transform   = get_transforms(mode='val')
+        test_transform  = get_transforms(mode='test')
+    """
+    if mode not in ('train', 'val', 'test'):
+        raise ValueError(f"mode must be 'train', 'val', or 'test'. Got: '{mode}'")
+
+    augment = (mode == 'train')
+
+    if preprocess:
+        # Full signature preprocessing pipeline with optional augmentation.
+        # All augmentation (morphological + geometric) is handled inside
+        # preprocess_image() AFTER canvas construction — not before binarization.
+        return transforms.Compose([
+            transforms.Lambda(
+                lambda img: preprocess_image(img, img_size=input_shape, augment=augment)
+            )
+        ])
+    else:
+        # Minimal pipeline for raw RGB input without binarization.
+        # Augmentation is intentionally excluded here since this path
+        # bypasses the binary canvas where augmentation is safe to apply.
+        return transforms.Compose([
+            transforms.Resize(input_shape),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )
+        ])
+
+
+# =============================================================================
+# LEGACY: DIRECTORY-BASED DATASET (kept for backward compatibility)
+# =============================================================================
 
 class SignaturePretrainDataset(Dataset):
-   """
-   A PyTorch Dataset class for Triplet-based Pre-training with Online Hard Negative Mining.
-  
-   This dataset generates triplets (Anchor, Positive, Negative) dynamically.
-   It prioritizes 'Hard Negatives' (skilled forgeries of the same user)
-   over 'Easy Negatives' (random signatures from other users) to accelerate convergence.
-   """
-  
-   def __init__(self, org_dir, forg_dir, transform=None, user_list=None):
-       """
-       Initializes the dataset by indexing all signature files.
+    """
+    [LEGACY] Triplet dataset that reads from org_dir / forg_dir directories.
 
+    This class is retained for backward compatibility with directory-based
+    pipelines. The active training pipeline uses SplitTripletDataset (in
+    proposed_cedar.py) which reads from split JSON user dictionaries instead.
 
-       Args:
-           org_dir (str): Path to the directory containing genuine signatures.
-           forg_dir (str): Path to the directory containing forged signatures.
-           transform (callable, optional): Transformations to apply to the images.
-           user_list (list, optional): Filter specific user IDs (used for splitting Train/Val).
-       """
-       self.transform = transform
-       self.org_images = []
-       self.forg_images = []
-      
-       # --- File Indexing Strategy ---
-       # Recursively search for image files to handle nested directory structures
-       # (common in BHSig and CEDAR datasets).
-       valid_exts = ('.png', '.tif', '.jpg', '.jpeg')
-      
-       for root, _, files in os.walk(org_dir):
-           for file in files:
-               if file.lower().endswith(valid_exts):
+    For new experiments, use SplitTripletDataset + get_transforms().
+    """
+
+    def __init__(self, org_dir, forg_dir, transform=None, user_list=None):
+        self.transform = transform
+        self.org_images = []
+        self.forg_images = []
+
+        valid_exts = ('.png', '.tif', '.jpg', '.jpeg')
+
+        for root, _, files in os.walk(org_dir):
+            for file in files:
+                if file.lower().endswith(valid_exts):
                     self.org_images.append(os.path.join(root, file))
-      
-       for root, _, files in os.walk(forg_dir):
-           for file in files:
+
+        for root, _, files in os.walk(forg_dir):
+            for file in files:
                 if file.lower().endswith(valid_exts):
                     self.forg_images.append(os.path.join(root, file))
 
+        if user_list is not None:
+            user_list = set(str(u) for u in user_list)
+            self.org_images = [
+                x for x in self.org_images
+                if self._get_user_id(os.path.basename(x)) in user_list
+            ]
+            self.forg_images = [
+                x for x in self.forg_images
+                if self._get_user_id(os.path.basename(x)) in user_list
+            ]
 
-       # --- User Filtering ---
-       if user_list is not None:
-           user_list = set(str(u) for u in user_list)
-           self.org_images = [x for x in self.org_images if self._get_user_id(os.path.basename(x)) in user_list]
-           self.forg_images = [x for x in self.forg_images if self._get_user_id(os.path.basename(x)) in user_list]
-      
-       # Create a mapping: UserID -> List of Genuine Signature Paths
-       self.user_genuine_map = {}
-       for path in self.org_images:
-           uid = self._get_user_id(os.path.basename(path))
-           if uid not in self.user_genuine_map:
-               self.user_genuine_map[uid] = []
-           self.user_genuine_map[uid].append(path)
-          
-       self.users = list(self.user_genuine_map.keys())
-       self.triplets = []
-       self.on_epoch_end() # Initial triplet generation
+        self.user_genuine_map = {}
+        for path in self.org_images:
+            uid = self._get_user_id(os.path.basename(path))
+            if uid not in self.user_genuine_map:
+                self.user_genuine_map[uid] = []
+            self.user_genuine_map[uid].append(path)
 
+        self.users = list(self.user_genuine_map.keys())
+        self.triplets = []
+        self.on_epoch_end()
 
-   def _get_user_id(self, filename):
-       """
-       Extracts User ID from filename.
-       Assumes format like 'original_1_1.png' or '001_01.png'.
-       Standardizes extraction using Regex.
-       """
-       # Matches the first sequence of digits found in the filename
-       import re
-       match = re.search(r'\d+', filename)
-       if match:
-           number = str(int(match.group(0)))
-           if 'H-' in filename:
-               return f"H-{number}"
-           elif 'B-' in filename:
-               return f"B-{number}"
-           else:
-               return number
-       return "unknown"
+    def _get_user_id(self, filename):
+        match = re.search(r'\d+', filename)
+        if match:
+            number = str(int(match.group(0)))
+            if 'H-' in filename:
+                return f"H-{number}"
+            elif 'B-' in filename:
+                return f"B-{number}"
+            else:
+                return number
+        return "unknown"
 
+    def on_epoch_end(self):
+        self.triplets = []
+        all_user_ids = list(self.user_genuine_map.keys())
 
-   def on_epoch_end(self):
-       """
-       Regenerates triplets at the end of each epoch.
-       This randomizes the pairings to prevent the model from overfitting to specific triplets.
-       """
-       self.triplets = []
-       all_user_ids = list(self.user_genuine_map.keys())
+        for anchor_path in self.org_images:
+            anchor_uid = self._get_user_id(os.path.basename(anchor_path))
+            positives = self.user_genuine_map.get(anchor_uid, [])
 
+            if len(positives) < 2:
+                continue
 
-       for anchor_path in self.org_images:
-           anchor_uid = self._get_user_id(os.path.basename(anchor_path))
-          
-           # 1. Select Positive (Another genuine signature from the same user)
-           positives = self.user_genuine_map.get(anchor_uid, [])
-           # Need at least 2 genuine samples to form a pair
-           if len(positives) < 2:
-               continue
-          
-           # Ensure Positive is not the same file as Anchor
-           possible_pos = [p for p in positives if p != anchor_path]
-           if not possible_pos:
-               continue
-           positive_path = random.choice(possible_pos)
+            possible_pos = [p for p in positives if p != anchor_path]
+            if not possible_pos:
+                continue
+            positive_path = random.choice(possible_pos)
 
+            current_forgeries = [
+                f for f in self.forg_images
+                if self._get_user_id(os.path.basename(f)) == anchor_uid
+            ]
+            is_hard_mining = (random.random() < 0.7) and (len(current_forgeries) > 0)
 
-           # 2. Select Negative (Hard Mining Logic)
-           # Strategy:
-           # - Hard Negative: A skilled forgery of the SAME user.
-           # - Easy Negative: A genuine signature of a DIFFERENT user.
-          
-           current_forgeries = [f for f in self.forg_images if self._get_user_id(os.path.basename(f)) == anchor_uid]
-          
-           # Probability threshold: 70% chance to pick a Hard Negative (if available)
-           is_hard_mining = (random.random() < 0.7) and (len(current_forgeries) > 0)
-          
-           if is_hard_mining:
-               negative_path = random.choice(current_forgeries)
-           else:
-               # Pick a random user that is NOT the anchor user
-               other_uid = random.choice([u for u in all_user_ids if u != anchor_uid])
-               negatives_from_other = self.user_genuine_map.get(other_uid, [])
-               if not negatives_from_other: continue
-               negative_path = random.choice(negatives_from_other)
-          
-           self.triplets.append((anchor_path, positive_path, negative_path))
+            if is_hard_mining:
+                negative_path = random.choice(current_forgeries)
+            else:
+                other_uid = random.choice([u for u in all_user_ids if u != anchor_uid])
+                negatives_from_other = self.user_genuine_map.get(other_uid, [])
+                if not negatives_from_other:
+                    continue
+                negative_path = random.choice(negatives_from_other)
 
+            self.triplets.append((anchor_path, positive_path, negative_path))
 
-   def __len__(self):
-       return len(self.triplets)
+    def __len__(self):
+        return len(self.triplets)
 
+    def __getitem__(self, idx):
+        anchor_path, pos_path, neg_path = self.triplets[idx]
+        anchor_img = Image.open(anchor_path).convert('RGB')
+        pos_img = Image.open(pos_path).convert('RGB')
+        neg_img = Image.open(neg_path).convert('RGB')
 
-   def __getitem__(self, idx):
-       """
-       Retrieves a triplet item.
-       Crucial: Converts images to RGB to match ResNet backbone requirements.
-       """
-       anchor_path, pos_path, neg_path = self.triplets[idx]
-      
-       # Load images
-       # CONVERT TO RGB: This is critical for ResNet (expects 3 channels)
-       anchor_img = Image.open(anchor_path).convert('RGB')
-       pos_img = Image.open(pos_path).convert('RGB')
-       neg_img = Image.open(neg_path).convert('RGB')
+        if self.transform:
+            anchor = self.transform(anchor_img)
+            pos = self.transform(pos_img)
+            neg = self.transform(neg_img)
 
-
-       # Apply Transforms (Augmentation)
-       if self.transform:
-           anchor = self.transform(anchor_img)
-           pos = self.transform(pos_img)
-           neg = self.transform(neg_img)
-          
-       # Return Triplet and a dummy label (TripletLoss doesn't use explicit labels)
-       return anchor, pos, neg, torch.tensor([1], dtype=torch.float32)
+        return anchor, pos, neg, torch.tensor([1], dtype=torch.float32)
