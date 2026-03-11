@@ -10,31 +10,86 @@ from torchvision import transforms
 
 
 # =============================================================================
+# AUGMENTATION PARAMS SAMPLING
+# =============================================================================
+
+def sample_augment_params():
+    """
+    Sample a single set of geometric augmentation parameters.
+
+    This is the core of the triplet-level augmentation contract:
+    by drawing params ONCE and sharing them across all three images in a
+    triplet (anchor, positive, negative), we guarantee that the model never
+    sees orientation-mismatched pairs during pretraining.
+
+    Used exclusively by:
+        - preprocess_image(..., augment_params=params)  ← proposed pipeline
+    NOT used by:
+        - get_transforms(mode='train')                  ← baseline pipeline
+          (baseline calls preprocess_image with augment=True internally,
+           drawing fresh params per image — correct for single-image classification)
+
+    Returns:
+        dict with keys:
+            flip   (bool)  : whether to apply horizontal flip
+            angle  (float) : rotation in degrees, range [-20, 20]
+            scale  (float) : zoom factor, range [0.80, 1.20]
+            tx     (float) : horizontal translation fraction, range [-0.20, 0.20]
+            ty     (float) : vertical   translation fraction, range [-0.20, 0.20]
+    """
+    return {
+        'flip':  random.random() < 0.5,
+        'angle': random.uniform(-20, 20),
+        'scale': random.uniform(0.80, 1.20),
+        'tx':    random.uniform(-0.20, 0.20),
+        'ty':    random.uniform(-0.20, 0.20),
+    }
+
+
+# =============================================================================
 # PREPROCESSING & AUGMENTATION
 # =============================================================================
 
-import random
-import cv2
-import torch
-import numpy as np
-from PIL import Image
-from torchvision import transforms
-
-def preprocess_image(img, img_size=(224, 224), augment=False):
+def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=None):
     """
-    Preprocesses a signature image through the full pipeline:
+    Preprocesses a signature image through the full pipeline.
+
+    Two augmentation modes — mutually exclusive:
+
+        A) Image-level   (baseline):  augment=True, augment_params=None
+           Parameters are sampled fresh inside this function.
+           Each call is independent — correct for single-image classifiers.
+
+        B) Triplet-level (proposed):  augment=False, augment_params=<dict>
+           Parameters are passed in from the caller (sampled once per triplet
+           via sample_augment_params()).  All three images in a triplet share
+           the same flip/rotation/scale/translation, so the model never sees
+           orientation-mismatched anchor-positive pairs.
 
     Pipeline (in order):
-        1. Convert to grayscale
-        2. Otsu binarization
-        3. Stroke inversion (strokes = white, background = black)
-        4. [Train only] Geometric augmentation (flip, rotation, translation, scale)
-           *Applied BEFORE cropping to prevent stroke cut-off.*
-        5. Tight crop with 10px margin
-        6. Aspect-aware resize preserving stroke proportions
-        7. Zero-padded centering onto 224x224 black canvas
-        8. Convert grayscale canvas to 3-channel RGB
-        9. Normalize with ImageNet statistics
+        1.  Convert to grayscale
+        2.  Otsu binarization
+        3.  Stroke inversion (strokes = white, background = black)
+        4.  [Augmentation] Geometric transforms — applied BEFORE cropping
+            to prevent signature strokes from being cut off at canvas edges.
+        5.  Tight crop with 10 px margin
+        6.  Aspect-aware resize preserving stroke proportions
+        7.  Zero-padded centering onto 224×224 black canvas
+        8.  Grayscale canvas → 3-channel RGB
+        9.  Float conversion + ImageNet normalization
+
+    Args:
+        img         : PIL Image or numpy array (RGB or grayscale).
+        img_size    : (H, W) target canvas size.  Default (224, 224).
+        augment     : If True, sample & apply augmentation internally
+                      (image-level mode — used by baseline via get_transforms).
+        augment_params : Pre-sampled param dict from sample_augment_params().
+                         If provided, augment flag is ignored and these params
+                         are applied directly (triplet-level mode — used by
+                         SplitTripletDataset.__getitem__).
+
+    Returns:
+        torch.Tensor: Normalized [3, H, W] float tensor.
     """
     if img is None:
         return None
@@ -54,34 +109,32 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
     _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     img_inv = cv2.bitwise_not(thresh)
 
-    # --- 4. Geometric Augmentation (training only) ---
-    # Applied BEFORE the tight crop so that transformations do not push
-    # the signature strokes outside the final 224x224 canvas boundaries.
-    if augment:
+    # --- 4. Geometric Augmentation ---
+    # Resolve which params to use:
+    #   - augment_params supplied → triplet-level mode (params from caller)
+    #   - augment=True            → image-level  mode  (sample fresh here)
+    #   - neither                 → no augmentation (val / test)
+    params = None
+    if augment_params is not None:
+        params = augment_params          # triplet-level: shared across all 3 images
+    elif augment:
+        params = sample_augment_params() # image-level:   fresh per image (baseline)
+
+    if params is not None:
         h, w = img_inv.shape
 
-        # Horizontal Flip (50% probability)
-        if random.random() < 0.5:
+        # Horizontal Flip
+        if params['flip']:
             img_inv = cv2.flip(img_inv, 1)
 
-        # Geometric Parameters:
-        # Rotation: ±20 degrees
-        # Scale (Zoom): ±20% (0.80 to 1.20)
-        # Translation (Shift): ±20% of width and height
-        angle = random.uniform(-20, 20)
-        scale_factor = random.uniform(0.80, 1.20)
-        
+        # Rotation + Scale + Translation (single affine pass)
         center = (w // 2, h // 2)
-        M_rot = cv2.getRotationMatrix2D(center, angle, scale_factor)
+        M = cv2.getRotationMatrix2D(center, params['angle'], params['scale'])
+        M[0, 2] += params['tx'] * w
+        M[1, 2] += params['ty'] * h
 
-        tx = random.uniform(-0.20, 0.20) * w
-        ty = random.uniform(-0.20, 0.20) * h
-        M_rot[0, 2] += tx
-        M_rot[1, 2] += ty
-
-        # Apply transformations with black background padding (fill=0)
         img_inv = cv2.warpAffine(
-            img_inv, M_rot, (w, h),
+            img_inv, M, (w, h),
             flags=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
             borderValue=0
@@ -132,31 +185,34 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
 
     return norm_tensor
 
+
 # =============================================================================
-# TRANSFORM FACTORY
+# TRANSFORM FACTORY  (baseline / val / test — image-level)
 # =============================================================================
 
 def get_transforms(mode='train', input_shape=(224, 224), preprocess=True):
     """
-    Returns the appropriate transform pipeline for a given mode.
+    Returns the image-level transform pipeline for a given mode.
+
+    This factory is used by:
+        • baseline_cedar.py  — SplitDataset  (train / val / test)
+        • proposed_cedar.py  — SplitEpisodicDataset (val / test)
+        • proposed_cedar.py  — SplitTripletDataset val/test splits only
+
+    It is NOT used for augmentation in SplitTripletDataset's training split.
+    There, augmentation is applied at the triplet level inside __getitem__
+    via sample_augment_params() + preprocess_image(augment_params=...).
 
     Args:
-        mode (str): One of 'train', 'val', or 'test'.
-                    'train' applies augmentation.
-                    'val' and 'test' apply preprocessing only (no augmentation).
+        mode (str): 'train' → augmentation ON (image-level, for baseline).
+                    'val' / 'test' → preprocessing only, no augmentation.
         input_shape (tuple): Target image size. Default (224, 224).
-        preprocess (bool): If True, applies the full signature preprocessing
-                           pipeline via preprocess_image(). If False, applies
-                           standard resize + ToTensor + Normalize (for raw RGB
-                           pipelines that skip binarization). Default True.
+        preprocess (bool): If True, runs the full signature binarization
+                           pipeline. If False, uses standard resize + ToTensor
+                           + Normalize for raw RGB inputs. Default True.
 
     Returns:
-        torchvision.transforms.Compose: The composed transform pipeline.
-
-    Example:
-        train_transform = get_transforms(mode='train')
-        val_transform   = get_transforms(mode='val')
-        test_transform  = get_transforms(mode='test')
+        torchvision.transforms.Compose
     """
     if mode not in ('train', 'val', 'test'):
         raise ValueError(f"mode must be 'train', 'val', or 'test'. Got: '{mode}'")
@@ -192,7 +248,7 @@ class SignaturePretrainDataset(Dataset):
     pipelines. The active training pipeline uses SplitTripletDataset (in
     proposed_cedar.py) which reads from split JSON user dictionaries instead.
 
-    For new experiments, use SplitTripletDataset + get_transforms().
+    For new experiments, use SplitTripletDataset + sample_augment_params().
     """
 
     def __init__(self, org_dir, forg_dir, transform=None, user_list=None):
