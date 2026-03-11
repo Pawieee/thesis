@@ -95,23 +95,30 @@ class CBAMBlock(nn.Module):
 # DENSENET-121 FEATURE EXTRACTOR
 # =============================================================================
 
-# DenseNet-121 output channel counts at each CBAM insertion point.
-# CBAM is applied POST-block (after each Dense Block + Transition), which is
-# the standard placement consistent with the original CBAM paper (Woo et al.,
-# ECCV 2018). Post-block placement recalibrates fully-enriched dense features,
-# giving attention more discriminative signal to work with than pre-block.
+# DenseNet-121 channel counts at each CBAM insertion point.
 #
-# Channel counts (DenseNet-121, Huang et al., CVPR 2017):
-#   After Transition 1 (post Block 1): 128
-#   After Transition 2 (post Block 2): 256
-#   After Transition 3 (post Block 3): 512
-#   After Dense Block 4 (before norm5): 1024
+# CBAM is placed AFTER each Dense Block, BEFORE each Transition layer.
+# This is the architecturally faithful placement per the CBAM paper (Woo et al.,
+# ECCV 2018), which inserts attention after convolutional feature extraction —
+# i.e. after the Dense Block has enriched features via concatenated skip
+# connections, but before the Transition's 1×1 conv + avg-pool compresses them.
+# Recalibrating before compression allows CBAM to suppress irrelevant channels
+# and spatial regions at full resolution, before information is discarded by the
+# transition's bottleneck.
+#
+# For Stage 4 (no transition): CBAM is placed after block4, before norm5.
+#
+# Channel counts AFTER each Dense Block (before transition compression):
+#   After Dense Block 1: 256   (64 stem + 6 layers × 32 growth)
+#   After Dense Block 2: 512   (128 trans1 out + 12 layers × 32 growth)
+#   After Dense Block 3: 1024  (256 trans2 out + 24 layers × 32 growth)
+#   After Dense Block 4: 1024  (512 trans3 out + 16 layers × 32 growth)
 #
 # These are fixed architectural constants — do NOT infer at runtime.
 _DENSENET121_CBAM_CHANNELS = {
-    'cbam1': 128,   # after block1 + trans1
-    'cbam2': 256,   # after block2 + trans2
-    'cbam3': 512,   # after block3 + trans3
+    'cbam1': 256,   # after block1, before trans1
+    'cbam2': 512,   # after block2, before trans2
+    'cbam3': 1024,  # after block3, before trans3
     'cbam4': 1024,  # after block4, before norm5
 }
 
@@ -125,23 +132,23 @@ class DenseNetFeatureExtractor(nn.Module):
     Baseline mode (baseline=True):
         Standard DenseNet-121 backbone with a Regularized Dense Block head.
         No CBAM modules. Produces a feature vector of size `output_dim`.
-        Backbone freeze/unfreeze is handled EXTERNALLY by the training loop.
+        Backbone freeze/unfreeze is handled EXTERNALLY by the training loop —
+        NOT in __init__.
 
     Proposed mode (baseline=False):
-        DenseNet-121 backbone with 4 CBAM blocks inserted AFTER each Dense Block
-        and its associated Transition layer (post-block placement). This follows
-        the standard CBAM integration: attention recalibrates the output of each
-        stage after dense feature extraction.
+        DenseNet-121 backbone with 4 CBAM blocks placed AFTER each Dense Block
+        and BEFORE each Transition layer. This is the architecturally faithful
+        placement per the CBAM paper — attention recalibrates the fully-enriched
+        dense features at full channel resolution before the transition compresses
+        them. For Stage 4 (no transition), CBAM is placed before norm5.
 
     Forward pass (proposed):
-        Input → Stem → Block1 → Trans1 → CBAM1
-               → Block2 → Trans2 → CBAM2
-               → Block3 → Trans3 → CBAM3
+        Input → Stem
+               → Block1 → CBAM1 → Trans1
+               → Block2 → CBAM2 → Trans2
+               → Block3 → CBAM3 → Trans3
                → Block4 → CBAM4 → Norm5 → ReLU
                → GlobalAvgPool → Flatten → RegularizedDenseBlock → Output
-
-    Note: CBAM4 is placed after Block4 but before Norm5 since Block4 has no
-    transition. The final BN (norm5) and ReLU follow CBAM4.
 
     Args:
         backbone_name (str): Backbone identifier. Only 'densenet121' supported.
@@ -167,6 +174,8 @@ class DenseNetFeatureExtractor(nn.Module):
 
         if self.baseline:
             # ── Baseline Mode ──────────────────────────────────────────────
+            # Full DenseNet-121 backbone, no CBAM.
+            # Backbone freeze/unfreeze handled by training loop, not here.
             self.backbone = features
             self.avgpool  = nn.AdaptiveAvgPool2d((1, 1))
             self.regularized_dense_block = nn.Sequential(
@@ -177,34 +186,37 @@ class DenseNetFeatureExtractor(nn.Module):
 
         else:
             # ── Proposed Mode ──────────────────────────────────────────────
-            # Post-block CBAM: attention applied AFTER each dense stage.
+            # CBAM after each Dense Block, before each Transition.
+            # This is the architecturally faithful placement: attention acts
+            # on fully-enriched dense features before transition compression.
 
-            # Stem: Conv7x7 + BN + ReLU + MaxPool
+            # Stem: Conv7×7 + BN + ReLU + MaxPool
             self.initial_layers = nn.Sequential(*list(features.children())[:4])
 
-            # Stage 1: Block → Transition → CBAM (128 ch)
+            # Stage 1: Block1 → CBAM1(256ch) → Trans1
             self.block1 = features.denseblock1
+            self.cbam1  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam1'])  # 256
             self.trans1 = features.transition1
-            self.cbam1  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam1'])
 
-            # Stage 2: Block → Transition → CBAM (256 ch)
+            # Stage 2: Block2 → CBAM2(512ch) → Trans2
             self.block2 = features.denseblock2
+            self.cbam2  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam2'])  # 512
             self.trans2 = features.transition2
-            self.cbam2  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam2'])
 
-            # Stage 3: Block → Transition → CBAM (512 ch)
+            # Stage 3: Block3 → CBAM3(1024ch) → Trans3
             self.block3 = features.denseblock3
+            self.cbam3  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam3'])  # 1024
             self.trans3 = features.transition3
-            self.cbam3  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam3'])
 
-            # Stage 4: Block → CBAM (1024 ch) → norm5
-            # No transition after block4; CBAM inserted before final BN.
+            # Stage 4: Block4 → CBAM4(1024ch) → Norm5
+            # No transition after block4; CBAM placed before final BN.
             self.block4 = features.denseblock4
-            self.cbam4  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam4'])
+            self.cbam4  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam4'])  # 1024
 
             self.norm5   = features.norm5
             self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
+            # Regularized Dense Block: BN → Dropout → Linear projection
             self.regularized_dense_block = nn.Sequential(
                 nn.BatchNorm1d(1024),
                 nn.Dropout(p=0.5),
@@ -212,6 +224,15 @@ class DenseNetFeatureExtractor(nn.Module):
             )
 
     def forward(self, x):
+        """
+        Forward pass through the feature extractor.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape [B, 3, H, W].
+
+        Returns:
+            torch.Tensor: Feature embedding of shape [B, output_dim].
+        """
         if self.baseline:
             x = self.backbone(x)
             x = F.relu(x, inplace=True)
@@ -220,25 +241,31 @@ class DenseNetFeatureExtractor(nn.Module):
             x = self.regularized_dense_block(x)
             return x
         else:
+            # Stem
             x = self.initial_layers(x)
 
+            # Block1 → CBAM1 → Trans1
             x = self.block1(x)
+            x = self.cbam1(x)         # attention at 256ch, before trans1 compresses
             x = self.trans1(x)
-            x = self.cbam1(x)         # post-block1 attention
 
+            # Block2 → CBAM2 → Trans2
             x = self.block2(x)
+            x = self.cbam2(x)         # attention at 512ch, before trans2 compresses
             x = self.trans2(x)
-            x = self.cbam2(x)         # post-block2 attention
 
+            # Block3 → CBAM3 → Trans3
             x = self.block3(x)
+            x = self.cbam3(x)         # attention at 1024ch, before trans3 compresses
             x = self.trans3(x)
-            x = self.cbam3(x)         # post-block3 attention
 
+            # Block4 → CBAM4 → Norm5 → ReLU
             x = self.block4(x)
-            x = self.cbam4(x)         # post-block4 attention (before norm5)
+            x = self.cbam4(x)         # attention at 1024ch, before final BN
             x = self.norm5(x)
             x = F.relu(x, inplace=True)
 
+            # GlobalAvgPool → Flatten → RegularizedDenseBlock
             x = self.avgpool(x)
             x = torch.flatten(x, 1)
             x = self.regularized_dense_block(x)
@@ -250,6 +277,7 @@ class DenseNetFeatureExtractor(nn.Module):
 
         Baseline:  all parameters in self.backbone
         Proposed:  initial_layers + all dense blocks + transitions + norm5
+                   (excludes CBAM modules — those are head params)
         """
         if self.baseline:
             return list(self.backbone.parameters())

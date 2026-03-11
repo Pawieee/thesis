@@ -61,15 +61,16 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
     img_inv = cv2.bitwise_not(thresh)
 
     # --- 4. Morphological augmentation (training only) ---
-    # Randomly erodes (thins) or dilates (thickens) strokes to simulate
-    # natural pen pressure variation. Applied with p=0.5.
+    # Randomly dilates (thickens) strokes to simulate natural pen pressure
+    # variation. Applied with p=0.5.
+    # NOTE: Erosion is intentionally excluded. Erosion thins strokes and can
+    # fragment fine pen strokes at small kernel sizes, destroying discriminative
+    # structural details. Dilation is the safer augmentation — it simulates
+    # heavier pen pressure without breaking strokes.
     if augment and random.random() < 0.5:
         kernel_size = random.choice([2, 3])
         kernel = np.ones((kernel_size, kernel_size), np.uint8)
-        if random.random() < 0.5:
-            img_inv = cv2.erode(img_inv, kernel, iterations=1)
-        else:
-            img_inv = cv2.dilate(img_inv, kernel, iterations=1)
+        img_inv = cv2.dilate(img_inv, kernel, iterations=1)
 
     # --- 5. Tight crop with margin ---
     coords = cv2.findNonZero(img_inv)
