@@ -13,6 +13,13 @@ from torchvision import transforms
 # PREPROCESSING & AUGMENTATION
 # =============================================================================
 
+import random
+import cv2
+import torch
+import numpy as np
+from PIL import Image
+from torchvision import transforms
+
 def preprocess_image(img, img_size=(224, 224), augment=False):
     """
     Preprocesses a signature image through the full pipeline:
@@ -21,25 +28,13 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
         1. Convert to grayscale
         2. Otsu binarization
         3. Stroke inversion (strokes = white, background = black)
-        4. [Train only] Morphological augmentation (erode/dilate)
+        4. [Train only] Geometric augmentation (flip, rotation, translation, scale)
+           *Applied BEFORE cropping to prevent stroke cut-off.*
         5. Tight crop with 10px margin
         6. Aspect-aware resize preserving stroke proportions
         7. Zero-padded centering onto 224x224 black canvas
-        8. [Train only] Geometric augmentation (rotation, translation, scale)
-           Applied AFTER canvas construction on the binary image.
-           Fill = 0 (black) to match background — NOT 255.
-        9. Convert grayscale canvas to 3-channel RGB (DenseNet compatibility)
-       10. Normalize with ImageNet statistics
-
-    Args:
-        img: PIL.Image or np.ndarray (RGB or grayscale)
-        img_size (tuple): Target canvas size. Default (224, 224).
-        augment (bool): Apply morphological + geometric augmentation.
-                        Must be False for validation and test.
-
-    Returns:
-        torch.Tensor: Normalized tensor of shape [3, H, W]
-        or None if input is None.
+        8. Convert grayscale canvas to 3-channel RGB
+        9. Normalize with ImageNet statistics
     """
     if img is None:
         return None
@@ -56,31 +51,51 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
         img_gray = img.copy()
 
     # --- 3. Otsu binarization + stroke inversion ---
-    # Result: strokes = 255 (white), background = 0 (black)
     _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     img_inv = cv2.bitwise_not(thresh)
 
-    # --- 4. Morphological (training only) ---
-    # Randomly dilates (thickens) strokes to simulate natural pen pressure
-    # variation. Applied with p=0.5.
-    # NOTE: Erosion is intentionally excluded. Erosion thins strokes and can
-    # fragment fine pen strokes at small kernel sizes, destroying discriminative
-    # structural details. Dilation is the safer augmentation — it simulates
-    # heavier pen pressure without breaking strokes.
-    if augment and random.random() < 0.5:
-        kernel_size = random.choice([2, 3])
-        kernel = np.ones((kernel_size, kernel_size), np.uint8)
-        img_inv = cv2.dilate(img_inv, kernel, iterations=1)
+    # --- 4. Geometric Augmentation (training only) ---
+    # Applied BEFORE the tight crop so that transformations do not push
+    # the signature strokes outside the final 224x224 canvas boundaries.
+    if augment:
+        h, w = img_inv.shape
+
+        # Horizontal Flip (50% probability)
+        if random.random() < 0.5:
+            img_inv = cv2.flip(img_inv, 1)
+
+        # Geometric Parameters:
+        # Rotation: ±20 degrees
+        # Scale (Zoom): ±20% (0.80 to 1.20)
+        # Translation (Shift): ±20% of width and height
+        angle = random.uniform(-20, 20)
+        scale_factor = random.uniform(0.80, 1.20)
+        
+        center = (w // 2, h // 2)
+        M_rot = cv2.getRotationMatrix2D(center, angle, scale_factor)
+
+        tx = random.uniform(-0.20, 0.20) * w
+        ty = random.uniform(-0.20, 0.20) * h
+        M_rot[0, 2] += tx
+        M_rot[1, 2] += ty
+
+        # Apply transformations with black background padding (fill=0)
+        img_inv = cv2.warpAffine(
+            img_inv, M_rot, (w, h),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_CONSTANT,
+            borderValue=0
+        )
 
     # --- 5. Tight crop with margin ---
     coords = cv2.findNonZero(img_inv)
     if coords is not None:
-        x, y, w, h = cv2.boundingRect(coords)
+        x, y, w_c, h_c = cv2.boundingRect(coords)
         margin = 10
         x_s = max(0, x - margin)
         y_s = max(0, y - margin)
-        x_e = min(img_inv.shape[1], x + w + margin)
-        y_e = min(img_inv.shape[0], y + h + margin)
+        x_e = min(img_inv.shape[1], x + w_c + margin)
+        y_e = min(img_inv.shape[0], y + h_c + margin)
         img_crop = img_inv[y_s:y_e, x_s:x_e]
     else:
         img_crop = img_inv
@@ -99,58 +114,15 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
         img_resized = cv2.resize(img_crop, (nw, nh), interpolation=cv2.INTER_AREA)
 
     # --- 7. Zero-padded centering onto black canvas ---
-    # Background = 0 (black), strokes = 255 (white)
     canvas = np.zeros(img_size, dtype=np.uint8)
     y_off = (target_size - nh) // 2
     x_off = (target_size - nw) // 2
     canvas[y_off:y_off + nh, x_off:x_off + nw] = img_resized
 
-    # --- 8. Geometric augmentation on canvas (training only) ---
-    # Applied AFTER canvas construction on the binary image.
-    # fill=0 matches the black background — using fill=255 would
-    # paint empty regions white (same as strokes), corrupting boundaries.
-    #
-    # Parameters chosen for realism:
-    #   Rotation:    ±15°    (reduced from ±20° — extreme rotation is unrealistic)
-    #   Translation: ±10%    (reduced from ±20% — large shifts push strokes off-canvas)
-    #   Scale:       90-110% (tightened from 80-120% — extreme scale distorts proportions)
-    #
-    # NOTE: RandomHorizontalFlip is intentionally excluded.
-    # A horizontally flipped signature is not a valid real-world sample —
-    # no writer produces a mirror image of their own signature.
-    if augment:
-        h_canvas, w_canvas = canvas.shape
-        center = (w_canvas // 2, h_canvas // 2)
-
-        # Random rotation ±15°
-        angle = random.uniform(-15, 15)
-
-        # Random scale 90–110%
-        scale_factor = random.uniform(0.90, 1.10)
-
-        # Rotation + scale matrix
-        M_rot = cv2.getRotationMatrix2D(center, angle, scale_factor)
-
-        # Random translation ±10% of canvas size
-        tx = random.uniform(-0.10, 0.10) * w_canvas
-        ty = random.uniform(-0.10, 0.10) * h_canvas
-        M_rot[0, 2] += tx
-        M_rot[1, 2] += ty
-
-        # Apply with BORDER_CONSTANT fill=0 (black background)
-        canvas = cv2.warpAffine(
-            canvas, M_rot, (w_canvas, h_canvas),
-            flags=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_CONSTANT,
-            borderValue=0
-        )
-
-    # --- 9. Grayscale → RGB (DenseNet requires 3-channel input) ---
-    # All three channels are identical since the source is binary grayscale.
-    # This is necessary for ImageNet-pretrained DenseNet-121 compatibility.
+    # --- 8. Grayscale → RGB ---
     img_rgb = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
 
-    # --- 10. Float conversion + ImageNet normalization ---
+    # --- 9. Float conversion + ImageNet normalization ---
     img_float = img_rgb.astype("float32") / 255.0
     tensor = torch.from_numpy(img_float).permute(2, 0, 1)
     norm_tensor = transforms.Normalize(
@@ -159,7 +131,6 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
     )(tensor)
 
     return norm_tensor
-
 
 # =============================================================================
 # TRANSFORM FACTORY
@@ -193,18 +164,12 @@ def get_transforms(mode='train', input_shape=(224, 224), preprocess=True):
     augment = (mode == 'train')
 
     if preprocess:
-        # Full signature preprocessing pipeline with optional augmentation.
-        # All augmentation (morphological + geometric) is handled inside
-        # preprocess_image() AFTER canvas construction — not before binarization.
         return transforms.Compose([
             transforms.Lambda(
                 lambda img: preprocess_image(img, img_size=input_shape, augment=augment)
             )
         ])
     else:
-        # Minimal pipeline for raw RGB input without binarization.
-        # Augmentation is intentionally excluded here since this path
-        # bypasses the binary canvas where augmentation is safe to apply.
         return transforms.Compose([
             transforms.Resize(input_shape),
             transforms.ToTensor(),
