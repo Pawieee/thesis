@@ -60,7 +60,7 @@ def preprocess_image(img, img_size=(224, 224), augment=False):
     _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     img_inv = cv2.bitwise_not(thresh)
 
-    # --- 4. Morphological augmentation (training only) ---
+    # --- 4. Morphological (training only) ---
     # Randomly dilates (thickens) strokes to simulate natural pen pressure
     # variation. Applied with p=0.5.
     # NOTE: Erosion is intentionally excluded. Erosion thins strokes and can
