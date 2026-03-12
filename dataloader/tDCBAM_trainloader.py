@@ -34,8 +34,6 @@ def sample_augment_params():
             flip         (bool)  : whether to apply horizontal flip
             angle        (float) : rotation in degrees, range [-20, 20]
             scale        (float) : zoom factor, range [0.80, 1.20]
-            tx           (float) : horizontal translation fraction, range [-0.20, 0.20]
-            ty           (float) : vertical   translation fraction, range [-0.20, 0.20]
             jitter_frac_y (float): canvas placement fraction along Y, range [0.0, 1.0]
             jitter_frac_x (float): canvas placement fraction along X, range [0.0, 1.0]
 
@@ -49,8 +47,8 @@ def sample_augment_params():
         'flip':          random.random() < 0.5,
         'angle':         random.uniform(-20, 20),
         'scale':         random.uniform(0.80, 1.20),
-        'tx':            random.uniform(-0.20, 0.20),
-        'ty':            random.uniform(-0.20, 0.20),
+        # Translation (tx, ty) removed to prevent stroke cutoff during affine warp.
+        # Safe translation is now handled entirely by jitter_frac in Step 7.
         'jitter_frac_y': random.random(),
         'jitter_frac_x': random.random(),
     }
@@ -82,21 +80,17 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
         3.  Stroke inversion (strokes = white, background = black).
             Kept white internally so Steps 4-7 (augmentation, crop,
             findNonZero, warpAffine borderValue=0) all remain unchanged.
-        4.  [Augmentation] Geometric transforms — applied BEFORE cropping
-            to prevent signature strokes from being cut off at canvas edges.
+        4.  [Augmentation] Geometric transforms — applied BEFORE cropping.
+            (Translation removed to prevent signature strokes from being cut off).
         5.  Tight crop with 10 px margin
         6.  Aspect-aware resize preserving stroke proportions
         7.  Canvas placement — centered (val/test) or jittered (train).
-            [FIX 2] Training augmentation uses jitter_frac_y/x from params
-            to randomly vary the signature position on the canvas, breaking
-            the fixed padding-boundary spatial pattern that Block3/CBAM3
-            was exploiting as a bounding-box geometry shortcut.
+            Training augmentation uses jitter_frac_y/x from params
+            to randomly vary the signature position on the canvas.
         8.  Canvas inversion + Grayscale to 3-channel RGB.
-            [FIX 1] canvas = 255 - canvas converts strokes=white/bg=black
-            to strokes=black/bg=white before RGB conversion. Aligns with
-            ImageNet convention (light background, dark foreground) and
-            removes the extreme -2.1 normalized background signal that
-            dominated channel statistics at Block3/CBAM3 and beyond.
+            canvas = 255 - canvas converts strokes=white/bg=black
+            to strokes=black/bg=white before RGB conversion. 
+            [FIX] Adds subtle Gaussian noise to break pure white zero-padding artifacts.
         9.  Float conversion + ImageNet normalization
 
     Args:
@@ -132,9 +126,6 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
 
     # --- 4. Geometric Augmentation ---
     # Resolve which params to use:
-    #   - augment_params supplied → triplet-level mode (params from caller)
-    #   - augment=True            → image-level  mode  (sample fresh here)
-    #   - neither                 → no augmentation (val / test)
     params = None
     if augment_params is not None:
         params = augment_params          # triplet-level: shared across all 3 images
@@ -148,11 +139,11 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
         if params['flip']:
             img_inv = cv2.flip(img_inv, 1)
 
-        # Rotation + Scale + Translation (single affine pass)
+        # Rotation + Scale (Translation handled safely in Step 7)
         center = (w // 2, h // 2)
         M = cv2.getRotationMatrix2D(center, params['angle'], params['scale'])
-        M[0, 2] += params['tx'] * w
-        M[1, 2] += params['ty'] * h
+        
+        # M[0, 2] and M[1, 2] translation removed here to prevent chopping off strokes.
 
         img_inv = cv2.warpAffine(
             img_inv, M, (w, h),
@@ -188,17 +179,6 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
         img_resized = cv2.resize(img_crop, (nw, nh), interpolation=cv2.INTER_AREA)
 
     # --- 7. Canvas placement — centered (val/test) or jittered (train) ---
-    # FIX 2: When augmentation params are active, use jitter_frac_y/x to
-    # randomly vary where the signature lands on the canvas.  This breaks the
-    # fixed padding-boundary spatial pattern (deterministic symmetric borders)
-    # that Block3/CBAM3 was learning as a bounding-box geometry shortcut.
-    #
-    # jitter_frac_* are fractions in [0, 1] stored in the shared params dict.
-    # Multiplying by the available slack (canvas - resized_dim) converts them
-    # to pixel offsets.  When slack == 0 (signature fills the canvas axis),
-    # the offset is 0 regardless of the fraction — no out-of-bounds risk.
-    #
-    # Val/test path: params is None — always center (deterministic, no jitter).
     canvas = np.zeros(img_size, dtype=np.uint8)
     y_slack = max(0, target_size - nh)
     x_slack = max(0, target_size - nw)
@@ -213,19 +193,15 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
     canvas[y_off:y_off + nh, x_off:x_off + nw] = img_resized
 
     # --- 8. Canvas inversion + Grayscale to RGB ---
-    # FIX 1: Invert the canvas here — after all spatial operations are done —
-    # to convert from internal strokes=white/background=black representation to
-    # strokes=black/background=white.  Doing the inversion at this final step
-    # keeps Steps 3-7 (bitwise_not, warpAffine borderValue=0, findNonZero)
-    # fully intact with zero risk of breaking crop or augmentation logic.
-    #
-    # Why this matters: background=white normalizes to ~+2.2, which is within
-    # the distribution DenseNet-121 saw during ImageNet pretraining (light
-    # backgrounds). The previous background=black normalized to ~-2.1, an
-    # extreme out-of-distribution value that dominated channel statistics at
-    # Block3/CBAM3 where spatial resolution collapses to 14x14 and the model
-    # could not distinguish strokes from the overwhelming background signal.
     canvas = 255 - canvas
+    
+    # Add subtle Gaussian noise to break pure white/zero-padding artifacts
+    # Only applied during training (when params is not None)
+    if params is not None:
+        # loc=0 (mean), scale=5 (standard deviation)
+        noise = np.random.normal(loc=0, scale=5.0, size=canvas.shape)
+        canvas = np.clip(canvas.astype(np.float32) + noise, 0, 255).astype(np.uint8)
+
     img_rgb = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
 
     # --- 9. Float conversion + ImageNet normalization ---
