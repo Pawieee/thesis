@@ -61,50 +61,7 @@ def sample_augment_params():
 def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=None):
     """
     Preprocesses a signature image through the full pipeline.
-
-    Two augmentation modes — mutually exclusive:
-
-        A) Image-level   (baseline):  augment=True, augment_params=None
-           Parameters are sampled fresh inside this function.
-           Each call is independent — correct for single-image classifiers.
-
-        B) Triplet-level (proposed):  augment=False, augment_params=<dict>
-           Parameters are passed in from the caller (sampled once per triplet
-           via sample_augment_params()).  All three images in a triplet share
-           the same flip/rotation/scale/translation, so the model never sees
-           orientation-mismatched anchor-positive pairs.
-
-    Pipeline (in order):
-        1.  Convert to grayscale
-        2.  Otsu binarization
-        3.  Stroke inversion (strokes = white, background = black).
-            Kept white internally so Steps 4-7 (augmentation, crop,
-            findNonZero, warpAffine borderValue=0) all remain unchanged.
-        4.  [Augmentation] Geometric transforms — applied BEFORE cropping.
-            (Translation removed to prevent signature strokes from being cut off).
-        5.  Tight crop with 10 px margin
-        6.  Aspect-aware resize preserving stroke proportions
-        7.  Canvas placement — centered (val/test) or jittered (train).
-            Training augmentation uses jitter_frac_y/x from params
-            to randomly vary the signature position on the canvas.
-        8.  Canvas inversion + Grayscale to 3-channel RGB.
-            canvas = 255 - canvas converts strokes=white/bg=black
-            to strokes=black/bg=white before RGB conversion. 
-            [FIX] Adds subtle Gaussian noise to break pure white zero-padding artifacts.
-        9.  Float conversion + ImageNet normalization
-
-    Args:
-        img         : PIL Image or numpy array (RGB or grayscale).
-        img_size    : (H, W) target canvas size.  Default (224, 224).
-        augment     : If True, sample & apply augmentation internally
-                      (image-level mode — used by baseline via get_transforms).
-        augment_params : Pre-sampled param dict from sample_augment_params().
-                         If provided, augment flag is ignored and these params
-                         are applied directly (triplet-level mode — used by
-                         SplitTripletDataset.__getitem__).
-
-    Returns:
-        torch.Tensor: Normalized [3, H, W] float tensor.
+    Background remains white (255) and strokes remain black (0) throughout.
     """
     if img is None:
         return None
@@ -120,50 +77,50 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
     else:
         img_gray = img.copy()
 
-    # --- 3. Otsu binarization + stroke inversion ---
-    _, thresh = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    img_inv = cv2.bitwise_not(thresh)
+    # --- 3. Otsu binarization ---
+    # Standard Otsu on a signature gives white background (255) and black strokes (0).
+    _, img_binary = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
 
     # --- 4. Geometric Augmentation ---
-    # Resolve which params to use:
     params = None
     if augment_params is not None:
-        params = augment_params          # triplet-level: shared across all 3 images
+        params = augment_params
     elif augment:
-        params = sample_augment_params() # image-level:   fresh per image (baseline)
+        params = sample_augment_params()
 
     if params is not None:
-        h, w = img_inv.shape
+        h, w = img_binary.shape
 
-        # Horizontal Flip
         if params['flip']:
-            img_inv = cv2.flip(img_inv, 1)
+            img_binary = cv2.flip(img_binary, 1)
 
-        # Rotation + Scale (Translation handled safely in Step 7)
         center = (w // 2, h // 2)
         M = cv2.getRotationMatrix2D(center, params['angle'], params['scale'])
-        
-        # M[0, 2] and M[1, 2] translation removed here to prevent chopping off strokes.
 
-        img_inv = cv2.warpAffine(
-            img_inv, M, (w, h),
+        # Apply transformation with borderValue=255 (White Padding)
+        img_binary = cv2.warpAffine(
+            img_binary, M, (w, h),
             flags=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
-            borderValue=0
+            borderValue=255  
         )
 
     # --- 5. Tight crop with margin ---
-    coords = cv2.findNonZero(img_inv)
+    # cv2.findNonZero requires the target to be >0. We temporarily pass an inverted 
+    # copy of the image JUST to find the coordinates of the black strokes.
+    coords = cv2.findNonZero(cv2.bitwise_not(img_binary))
+    
     if coords is not None:
         x, y, w_c, h_c = cv2.boundingRect(coords)
         margin = 10
         x_s = max(0, x - margin)
         y_s = max(0, y - margin)
-        x_e = min(img_inv.shape[1], x + w_c + margin)
-        y_e = min(img_inv.shape[0], y + h_c + margin)
-        img_crop = img_inv[y_s:y_e, x_s:x_e]
+        x_e = min(img_binary.shape[1], x + w_c + margin)
+        y_e = min(img_binary.shape[0], y + h_c + margin)
+        # Crop the original white-background image
+        img_crop = img_binary[y_s:y_e, x_s:x_e]
     else:
-        img_crop = img_inv
+        img_crop = img_binary
 
     # --- 6. Aspect-aware resize ---
     target_size = img_size[0]
@@ -178,27 +135,25 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
     else:
         img_resized = cv2.resize(img_crop, (nw, nh), interpolation=cv2.INTER_AREA)
 
-    # --- 7. Canvas placement — centered (val/test) or jittered (train) ---
-    canvas = np.zeros(img_size, dtype=np.uint8)
+    # --- 7. Canvas placement ---
+    # Initialize a pure WHITE canvas (255) instead of black
+    canvas = np.full(img_size, 255, dtype=np.uint8)
+    
     y_slack = max(0, target_size - nh)
     x_slack = max(0, target_size - nw)
     if params is not None:
-        # Training: jittered placement using shared fractional offsets
         y_off = int(params['jitter_frac_y'] * y_slack)
         x_off = int(params['jitter_frac_x'] * x_slack)
     else:
-        # Val / test: deterministic centered placement
         y_off = y_slack // 2
         x_off = x_slack // 2
+        
     canvas[y_off:y_off + nh, x_off:x_off + nw] = img_resized
 
-    # --- 8. Canvas inversion + Grayscale to RGB ---
-    canvas = 255 - canvas
-    
-    # Add subtle Gaussian noise to break pure white/zero-padding artifacts
-    # Only applied during training (when params is not None)
+    # --- 8. Grayscale to RGB + Noise ---
+    # No inversion needed here anymore!
     if params is not None:
-        # loc=0 (mean), scale=5 (standard deviation)
+        # Add subtle Gaussian noise to break pure white/zero-padding artifacts
         noise = np.random.normal(loc=0, scale=5.0, size=canvas.shape)
         canvas = np.clip(canvas.astype(np.float32) + noise, 0, 255).astype(np.uint8)
 
