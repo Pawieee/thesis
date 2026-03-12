@@ -177,6 +177,7 @@ class DenseNetFeatureExtractor(nn.Module):
             # Full DenseNet-121 backbone, no CBAM.
             # Backbone freeze/unfreeze handled by training loop, not here.
             self.backbone = features
+            self.post_norm_relu = nn.ReLU(inplace=False)
             self.avgpool  = nn.AdaptiveAvgPool2d((1, 1))
             self.regularized_dense_block = nn.Sequential(
                 nn.BatchNorm1d(1024),
@@ -214,6 +215,7 @@ class DenseNetFeatureExtractor(nn.Module):
             self.cbam4  = CBAMBlock(channels=_DENSENET121_CBAM_CHANNELS['cbam4'])  # 1024
 
             self.norm5   = features.norm5
+            self.post_norm_relu = nn.ReLU(inplace=False)
             self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
             # Regularized Dense Block: BN → Dropout → Linear projection
@@ -235,7 +237,7 @@ class DenseNetFeatureExtractor(nn.Module):
         """
         if self.baseline:
             x = self.backbone(x)
-            x = F.relu(x, inplace=True)
+            x = self.post_norm_relu(x)
             x = self.avgpool(x)
             x = torch.flatten(x, 1)
             x = self.regularized_dense_block(x)
@@ -263,7 +265,7 @@ class DenseNetFeatureExtractor(nn.Module):
             x = self.block4(x)
             x = self.cbam4(x)         # attention at 1024ch, before final BN
             x = self.norm5(x)
-            x = F.relu(x, inplace=True)
+            x = self.post_norm_relu(x)
 
             # GlobalAvgPool → Flatten → RegularizedDenseBlock
             x = self.avgpool(x)
