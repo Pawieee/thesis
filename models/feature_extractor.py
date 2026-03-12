@@ -271,6 +271,7 @@ class DenseNetFeatureExtractor(nn.Module):
             x = self.avgpool(x)
             x = torch.flatten(x, 1)
             x = self.regularized_dense_block(x)
+            x = F.normalize(x, p=2, dim=1)
             return x
 
     def get_backbone_params(self):
