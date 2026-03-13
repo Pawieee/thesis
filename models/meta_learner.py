@@ -15,7 +15,7 @@ class MetricGenerator(nn.Module):
     """
 
     # CHANGED: embedding_dim defaults to 1024 (size of absolute difference)
-    def __init__(self, embedding_dim=1024, hidden_dim=256, dropout=0.5):
+    def __init__(self, embedding_dim=1024, hidden_dim=256, dropout=0.3):
         """
         Initializes the Relation Network architecture.
 
