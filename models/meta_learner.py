@@ -29,8 +29,6 @@ class MetricGenerator(nn.Module):
         
         # Deep Relation Module (MLP)
         self.relation_module = nn.Sequential(
-            # Remove if pangit ni.
-            nn.BatchNorm1d(embedding_dim),
 
             # 1. Feature Interaction Layer
             nn.Linear(embedding_dim, hidden_dim),
