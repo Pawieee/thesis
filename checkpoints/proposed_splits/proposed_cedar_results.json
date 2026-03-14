@@ -16,9 +16,9 @@
   },
   "timing": {
     "CEDAR (70:15:15)": {
-      "pretrain_s": 181.4,
-      "meta_s": 58.1,
-      "total_s": 239.5
+      "pretrain_s": 182.8,
+      "meta_s": 60.2,
+      "total_s": 242.9
     }
   }
 }
