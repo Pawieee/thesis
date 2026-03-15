@@ -4,10 +4,10 @@ import torch.nn.functional as F
 
 class TripletLoss(nn.Module):
     """
-    Online Batch Semi-Hard Triplet Loss.
+    Online Batch Semi-Hard Triplet Loss (Unsquared Euclidean).
 
-    Computes pairwise distances. For each Anchor, it selects a Negative that is
-    further away than the Positive, but still within the margin:
+    Computes pairwise true Euclidean distances. For each Anchor, it selects a Negative 
+    that is further away than the Positive, but still within the margin:
     d(a, p) < d(a, n) < d(a, p) + margin.
     If no such negative exists in the batch, it defaults to the hardest negative.
     """
@@ -20,18 +20,23 @@ class TripletLoss(nn.Module):
     def forward(self, anchor, positive, negative):
         B = anchor.size(0)
 
-        # 1. Distance between Anchor and its paired Positive
+        # 1. True Euclidean Distance between Anchor and its paired Positive
         if self.mode == 'euclidean':
-            dist_pos = torch.sum(torch.pow(anchor - positive, 2), dim=1) # Shape: [B]
+            dist_pos_sq = torch.sum(torch.pow(anchor - positive, 2), dim=1) 
+            # Clamp before square root to prevent NaN gradients at distance 0
+            dist_pos = torch.sqrt(torch.clamp(dist_pos_sq, min=1e-16)) # Shape: [B]
         else:
             dist_pos = 1.0 - F.cosine_similarity(anchor, positive)
 
-        # 2. Pairwise Distance between ALL Anchors and ALL Negatives
+        # 2. Pairwise True Euclidean Distance between ALL Anchors and ALL Negatives
         if self.mode == 'euclidean':
             dot_product = torch.mm(anchor, negative.t())
             anchor_norm = torch.sum(anchor ** 2, dim=1, keepdim=True)
             negative_norm = torch.sum(negative ** 2, dim=1).unsqueeze(0)
-            dist_matrix = torch.clamp(anchor_norm + negative_norm - 2.0 * dot_product, min=1e-16)
+            
+            # Calculate squared matrix, clamp it, then apply sqrt to the whole matrix
+            dist_matrix_sq = torch.clamp(anchor_norm + negative_norm - 2.0 * dot_product, min=1e-16)
+            dist_matrix = torch.sqrt(dist_matrix_sq)
         else:
             anchor_normed = F.normalize(anchor, p=2, dim=1)
             negative_normed = F.normalize(negative, p=2, dim=1)
