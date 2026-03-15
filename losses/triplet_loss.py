@@ -4,12 +4,12 @@ import torch.nn.functional as F
 
 class TripletLoss(nn.Module):
     """
-    Online Batch Semi-Hard Triplet Loss.
+    Online Batch-Hard Triplet Loss.
 
-    Computes pairwise distances. For each Anchor, it selects a Negative that is
-    further away than the Positive, but still within the margin:
-    d(a, p) < d(a, n) < d(a, p) + margin.
-    If no such negative exists in the batch, it defaults to the hardest negative.
+    Instead of relying on the dataset to randomly guess a hard negative,
+    this loss function computes the distance between every Anchor in the batch
+    and every Negative in the batch. For each Anchor, it mathematically selects
+    the absolute closest Negative (the Hardest Negative) to compute the loss.
     """
     def __init__(self, margin=0.25, mode='euclidean'):
         super(TripletLoss, self).__init__()
@@ -18,6 +18,12 @@ class TripletLoss(nn.Module):
         self.last_fraction_active = 0.0
 
     def forward(self, anchor, positive, negative):
+        """
+        Args:
+            anchor   (Tensor): [B, D]
+            positive (Tensor): [B, D]
+            negative (Tensor): [B, D]
+        """
         B = anchor.size(0)
 
         # 1. Distance between Anchor and its paired Positive
@@ -26,48 +32,31 @@ class TripletLoss(nn.Module):
         else:
             dist_pos = 1.0 - F.cosine_similarity(anchor, positive)
 
-        # 2. Pairwise Distance between ALL Anchors and ALL Negatives
+        # 2. Pairwise Distance between ALL Anchors and ALL Negatives in the batch
+        # We compute a [B, B] matrix where element (i, j) is the distance 
+        # between Anchor i and Negative j.
         if self.mode == 'euclidean':
-            dot_product = torch.mm(anchor, negative.t())
-            anchor_norm = torch.sum(anchor ** 2, dim=1, keepdim=True)
-            negative_norm = torch.sum(negative ** 2, dim=1).unsqueeze(0)
+            # Efficient pairwise squared euclidean distance: ||a-b||^2 = ||a||^2 + ||b||^2 - 2<a,b>
+            dot_product = torch.mm(anchor, negative.t())             # [B, B]
+            anchor_norm = torch.sum(anchor ** 2, dim=1, keepdim=True)  # [B, 1]
+            negative_norm = torch.sum(negative ** 2, dim=1).unsqueeze(0) # [1, B]
+            
+            # Clamp to prevent tiny negative numbers due to floating point precision
             dist_matrix = torch.clamp(anchor_norm + negative_norm - 2.0 * dot_product, min=1e-16)
         else:
+            # Pairwise Cosine Distance
             anchor_normed = F.normalize(anchor, p=2, dim=1)
             negative_normed = F.normalize(negative, p=2, dim=1)
             cosine_sim_matrix = torch.mm(anchor_normed, negative_normed.t())
             dist_matrix = 1.0 - cosine_sim_matrix
 
-        # 3. SEMI-HARD NEGATIVE MINING
-        # We want negatives where: dist_pos < dist_neg < dist_pos + margin
-        
-        # Create masks
-        dist_pos_expanded = dist_pos.unsqueeze(1).expand_as(dist_matrix) # [B, B]
-        
-        # Mask 1: Negative must be further than the Positive
-        is_harder_than_pos = dist_matrix > dist_pos_expanded
-        
-        # Mask 2: Negative must be within the margin
-        is_violating_margin = dist_matrix < (dist_pos_expanded + self.margin)
-        
-        # Combine masks to find valid Semi-Hard negatives
-        semi_hard_mask = is_harder_than_pos & is_violating_margin
-        
-        # Select the negative
-        selected_dist_neg = torch.zeros(B, device=anchor.device)
-        
-        for i in range(B):
-            valid_indices = torch.nonzero(semi_hard_mask[i]).squeeze(1)
-            if valid_indices.numel() > 0:
-                # If semi-hard negatives exist, pick the hardest one among them
-                valid_dists = dist_matrix[i, valid_indices]
-                selected_dist_neg[i] = torch.min(valid_dists)
-            else:
-                # Fallback: If no semi-hard exists, pick the absolute hardest
-                selected_dist_neg[i] = torch.min(dist_matrix[i])
+        # 3. HARD NEGATIVE MINING
+        # For each Anchor (each row), find the minimum distance to ANY Negative in the batch
+        # This is the absolute hardest negative available.
+        hardest_dist_neg, _ = torch.min(dist_matrix, dim=1) # Shape: [B]
 
-        # 4. Compute standard Hinge Loss using the selected negatives
-        losses = F.relu(dist_pos - selected_dist_neg + self.margin)
+        # 4. Compute standard Hinge Loss using the hardest negatives
+        losses = F.relu(dist_pos - hardest_dist_neg + self.margin)
 
         # --- Active triplet filtering ---
         active_mask = losses > 0
