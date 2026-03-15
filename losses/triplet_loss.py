@@ -45,8 +45,8 @@ class TripletLoss(nn.Module):
         
         invalid_mask = (is_forg_j == 0) & (n_label_j == a_label_i)
         
-        # Set invalid distances to infinity so they are never picked as hard negatives
-        dist_matrix.masked_fill_(invalid_mask, float('inf'))
+        # FIX: Use out-of-place masked_fill (no trailing underscore)
+        dist_matrix = dist_matrix.masked_fill(invalid_mask, float('inf'))
 
         # 4. HARD NEGATIVE MINING
         hardest_dist_neg, _ = torch.min(dist_matrix, dim=1) 
