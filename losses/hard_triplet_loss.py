@@ -5,6 +5,7 @@ import torch.nn.functional as F
 class TripletLoss(nn.Module):
     """
     Online Batch-Hard Triplet Loss.
+    SQUARED EUCLIDEAN
 
     Instead of relying on the dataset to randomly guess a hard negative,
     this loss function computes the distance between every Anchor in the batch
