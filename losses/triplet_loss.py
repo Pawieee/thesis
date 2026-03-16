@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class OnlineTripletLoss(nn.Module):
+class TripletLoss(nn.Module):
     """
     Online Batch Hard Triplet Loss (Squared Euclidean, L2-normalized embeddings).
 
