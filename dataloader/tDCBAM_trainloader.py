@@ -9,26 +9,36 @@ from PIL import Image
 from torchvision import transforms
 
 
+# Maximum canvas-placement jitter offset in pixels (applied around centre).
+_MAX_JITTER_PX = 20
+
+
 # =============================================================================
 # AUGMENTATION PARAMS SAMPLING
 # =============================================================================
 
 def sample_augment_params():
     """
-    Sample a single set of geometric augmentation parameters.
+    Sample one set of geometric augmentation parameters.
 
-    For independent augmentation, this should be called individually for the 
-    Anchor, Positive, and Negative images. This forces the model to learn 
-    spatial invariance and handle natural intra-class geometric variations.
+    No horizontal flip — signatures are directional and independent flip
+    between images in a triplet corrupts the loss signal.
 
-    Bounds are kept tight to realistically simulate human handwriting variability:
-        - angle: [-15, 15] degrees (natural slant variation)
-        - scale: [0.85, 1.15] (natural size/pressure variation)
-        - jitter_frac: [0.0, 1.0] (canvas placement variation)
+    No affine translation — pre-crop translation is cancelled by the tight
+    crop and risks clipping strokes at scan boundaries. Position variation
+    is handled instead by canvas-placement jitter after resize.
+
+    Returns
+    -------
+    dict:
+        angle         (float): rotation in degrees    [-15, 15]
+        scale         (float): zoom factor            [0.85, 1.15]
+        jitter_frac_y (float): vertical placement     [0.0, 1.0]
+        jitter_frac_x (float): horizontal placement   [0.0, 1.0]
     """
     return {
-        'angle':         random.uniform(-15, 15),
-        'scale':         random.uniform(0.85, 1.15),
+        'angle':         random.uniform(-15.0, 15.0),
+        'scale':         random.uniform(0.85,  1.15),
         'jitter_frac_y': random.random(),
         'jitter_frac_x': random.random(),
     }
@@ -40,28 +50,65 @@ def sample_augment_params():
 
 def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=None):
     """
-    Preprocesses a signature image through the full pipeline.
-    Background remains white (255) and strokes remain black (0) throughout.
+    Signature preprocessing pipeline.
+
+    Produces white strokes on a black background (bitwise_not after Otsu).
+    This aligns with CBAM's attention mechanism, which highlights high-activation
+    regions, and ensures zero-padded canvas borders blend with the background.
+
+    Augmentation modes:
+        Triplet-level : augment=False, augment_params=<dict>
+                        Shared params across anchor/positive/negative.
+        Image-level   : augment=True,  augment_params=None
+                        Fresh params sampled per call.
+        Inference     : augment=False, augment_params=None
+                        No augmentation; signature centred exactly.
+
+    Pipeline:
+        1.  PIL / numpy  →  numpy RGB
+        2.  Grayscale
+        3.  Otsu binarisation    (background=255, strokes=0)
+        4.  Stroke inversion     (background=0,   strokes=255)
+        5.  Rotation + scale via warpAffine
+        6.  Tight crop           findNonZero + 10 px margin
+        7.  Aspect-aware resize  scale = target / max(h, w)
+        8.  Canvas placement     centred ± _MAX_JITTER_PX px, clamped to slack
+        9.  Grayscale  →  RGB
+        10. /255  +  ImageNet normalisation
+
+    Parameters
+    ----------
+    img            : PIL.Image or numpy array.
+    img_size       : (H, W) canvas size. Default (224, 224).
+    augment        : Apply image-level augmentation.
+    augment_params : Pre-sampled dict for triplet-level augmentation.
+
+    Returns
+    -------
+    torch.Tensor: [3, H, W] float tensor, ImageNet-normalised.
     """
     if img is None:
         return None
 
-    # --- 1. Ensure numpy RGB array ---
+    # 1. Ensure numpy RGB
     if isinstance(img, Image.Image):
         img = img.convert("RGB")
         img = np.array(img)
 
-    # --- 2. Grayscale conversion ---
-    if img.ndim == 3:
-        img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    else:
-        img_gray = img.copy()
+    # 2. Grayscale
+    img_gray = (
+        cv2.cvtColor(img, cv2.COLOR_RGB2GRAY) if img.ndim == 3 else img.copy()
+    )
 
-    # --- 3. Otsu binarization ---
-    # Standard Otsu on a signature gives white background (255) and black strokes (0).
-    _, img_binary = cv2.threshold(img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # 3. Otsu binarisation
+    _, thresh = cv2.threshold(
+        img_gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
 
-# --- 4. Geometric Augmentation ---
+    # 4. Stroke inversion — white strokes on black background
+    img_inv = cv2.bitwise_not(thresh)
+
+    # 5. Geometric augmentation
     params = None
     if augment_params is not None:
         params = augment_params
@@ -69,39 +116,30 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
         params = sample_augment_params()
 
     if params is not None:
-        h, w = img_binary.shape
-
-        # HORIZONTAL FLIPPING REMOVED to preserve stroke directionality
-
+        h, w = img_inv.shape
         center = (w // 2, h // 2)
         M = cv2.getRotationMatrix2D(center, params['angle'], params['scale'])
-
-        # Apply transformation with borderValue=255 (White Padding)
-        img_binary = cv2.warpAffine(
-            img_binary, M, (w, h),
+        img_inv = cv2.warpAffine(
+            img_inv, M, (w, h),
             flags=cv2.INTER_LINEAR,
             borderMode=cv2.BORDER_CONSTANT,
-            borderValue=255  
+            borderValue=0
         )
 
-    # --- 5. Tight crop with margin ---
-    # cv2.findNonZero requires the target to be >0. We temporarily pass an inverted 
-    # copy of the image JUST to find the coordinates of the black strokes.
-    coords = cv2.findNonZero(cv2.bitwise_not(img_binary))
-    
+    # 6. Tight crop with 10 px margin
+    coords = cv2.findNonZero(img_inv)
     if coords is not None:
         x, y, w_c, h_c = cv2.boundingRect(coords)
         margin = 10
         x_s = max(0, x - margin)
         y_s = max(0, y - margin)
-        x_e = min(img_binary.shape[1], x + w_c + margin)
-        y_e = min(img_binary.shape[0], y + h_c + margin)
-        # Crop the original white-background image
-        img_crop = img_binary[y_s:y_e, x_s:x_e]
+        x_e = min(img_inv.shape[1], x + w_c + margin)
+        y_e = min(img_inv.shape[0], y + h_c + margin)
+        img_crop = img_inv[y_s:y_e, x_s:x_e]
     else:
-        img_crop = img_binary
+        img_crop = img_inv
 
-    # --- 6. Aspect-aware resize ---
+    # 7. Aspect-aware resize
     target_size = img_size[0]
     h_c, w_c = img_crop.shape
     scale = target_size / max(h_c, w_c)
@@ -114,31 +152,32 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
     else:
         img_resized = cv2.resize(img_crop, (nw, nh), interpolation=cv2.INTER_AREA)
 
-    # --- 7. Canvas placement ---
-    # Initialize a pure WHITE canvas (255) instead of black
-    canvas = np.full(img_size, 255, dtype=np.uint8)
-    
-    y_slack = max(0, target_size - nh)
-    x_slack = max(0, target_size - nw)
+    # 8. Canvas placement
+    #    jitter_frac=0.5 → centred (inference default).
+    #    Other values shift up to ±_MAX_JITTER_PX px around centre,
+    #    clamped to available slack so strokes never leave the canvas.
+    canvas = np.zeros(img_size, dtype=np.uint8)
+
+    y_slack = target_size - nh
+    x_slack = target_size - nw
+    y_center = y_slack // 2
+    x_center = x_slack // 2
+
     if params is not None:
-        y_off = int(params['jitter_frac_y'] * y_slack)
-        x_off = int(params['jitter_frac_x'] * x_slack)
+        y_delta = int((params['jitter_frac_y'] * 2.0 - 1.0) * _MAX_JITTER_PX)
+        x_delta = int((params['jitter_frac_x'] * 2.0 - 1.0) * _MAX_JITTER_PX)
+        y_off = max(0, min(y_slack, y_center + y_delta))
+        x_off = max(0, min(x_slack, x_center + x_delta))
     else:
-        y_off = y_slack // 2
-        x_off = x_slack // 2
-        
+        y_off = y_center
+        x_off = x_center
+
     canvas[y_off:y_off + nh, x_off:x_off + nw] = img_resized
 
-    # --- 8. Grayscale to RGB + Noise ---
-    # No inversion needed here anymore!
-    if params is not None:
-        # Add subtle Gaussian noise to break pure white/zero-padding artifacts
-        noise = np.random.normal(loc=0, scale=5.0, size=canvas.shape)
-        canvas = np.clip(canvas.astype(np.float32) + noise, 0, 255).astype(np.uint8)
-
+    # 9. Grayscale → RGB
     img_rgb = cv2.cvtColor(canvas, cv2.COLOR_GRAY2RGB)
 
-    # --- 9. Float conversion + ImageNet normalization ---
+    # 10. Float + ImageNet normalisation
     img_float = img_rgb.astype("float32") / 255.0
     tensor = torch.from_numpy(img_float).permute(2, 0, 1)
     norm_tensor = transforms.Normalize(
@@ -155,23 +194,15 @@ def preprocess_image(img, img_size=(224, 224), augment=False, augment_params=Non
 
 class PreprocessTransform:
     """
-    Picklable wrapper around preprocess_image for use with DataLoader workers.
+    Picklable wrapper around preprocess_image for DataLoader workers.
 
-    Python 3.14+ changed the default multiprocessing start method on Linux
-    to 'forkserver', which requires all objects passed to worker processes
-    to be picklable. transforms.Lambda wrapping a local lambda function is
-    NOT picklable under forkserver because local functions cannot be serialised
-    by pickle.
+    Replaces transforms.Lambda, which is not picklable under Python 3.14+
+    forkserver / Windows spawn multiprocessing.
 
-    This class is a direct drop-in replacement for:
-        transforms.Lambda(lambda img: preprocess_image(img, img_size=..., augment=...))
-
-    It produces identical output and is fully picklable because it stores
-    only plain Python values (tuple and bool) as instance attributes.
-
-    Args:
-        input_shape (tuple): Target canvas size (H, W). Default (224, 224).
-        augment     (bool) : Whether to apply random augmentation.
+    Parameters
+    ----------
+    input_shape (tuple): Canvas size (H, W). Default (224, 224).
+    augment     (bool) : Apply random augmentation. Default False.
     """
 
     def __init__(self, input_shape=(224, 224), augment=False):
@@ -179,52 +210,46 @@ class PreprocessTransform:
         self.augment     = augment
 
     def __call__(self, img):
-        return preprocess_image(img, img_size=self.input_shape,
-                                augment=self.augment)
+        return preprocess_image(
+            img, img_size=self.input_shape, augment=self.augment
+        )
 
     def __repr__(self):
-        return (f"PreprocessTransform("
-                f"input_shape={self.input_shape}, augment={self.augment})")
+        return (
+            f"PreprocessTransform("
+            f"input_shape={self.input_shape}, augment={self.augment})"
+        )
 
 
 # =============================================================================
-# TRANSFORM FACTORY  (baseline / val / test — image-level)
+# TRANSFORM FACTORY
 # =============================================================================
 
 def get_transforms(mode='train', input_shape=(224, 224), preprocess=True):
     """
     Returns the image-level transform pipeline for a given mode.
 
-    This factory is used by:
-        • baseline_cedar.py  — SplitDataset  (train / val / test)
-        • proposed_cedar.py  — SplitEpisodicDataset (val / test)
-        • proposed_cedar.py  — SplitTripletDataset val/test splits only
+    Used by baseline SplitDataset and proposed SplitEpisodicDataset.
+    Not used for SplitTripletDataset training splits (triplet-level aug).
 
-    It is NOT used for augmentation in SplitTripletDataset's training split.
-    There, augmentation is applied at the triplet level inside __getitem__
-    via sample_augment_params() + preprocess_image(augment_params=...).
+    Parameters
+    ----------
+    mode        : 'train' | 'val' | 'test'
+    input_shape : Canvas size. Default (224, 224).
+    preprocess  : True → full signature pipeline. False → resize + normalize.
 
-    Args:
-        mode (str): 'train' → augmentation ON (image-level, for baseline).
-                    'val' / 'test' → preprocessing only, no augmentation.
-        input_shape (tuple): Target image size. Default (224, 224).
-        preprocess (bool): If True, runs the full signature binarization
-                           pipeline. If False, uses standard resize + ToTensor
-                           + Normalize for raw RGB inputs. Default True.
-
-    Returns:
-        torchvision.transforms.Compose
+    Returns
+    -------
+    torchvision.transforms.Compose
     """
     if mode not in ('train', 'val', 'test'):
-        raise ValueError(f"mode must be 'train', 'val', or 'test'. Got: '{mode}'")
+        raise ValueError(
+            f"mode must be 'train', 'val', or 'test'. Got: '{mode}'"
+        )
 
     augment = (mode == 'train')
 
     if preprocess:
-        # PreprocessTransform is used instead of transforms.Lambda because
-        # Lambda wrapping a local function is not picklable under Python 3.14+
-        # forkserver multiprocessing. PreprocessTransform is fully picklable
-        # and produces identical output. See PreprocessTransform docstring.
         return transforms.Compose([
             PreprocessTransform(input_shape=input_shape, augment=augment)
         ])
@@ -245,13 +270,10 @@ def get_transforms(mode='train', input_shape=(224, 224), preprocess=True):
 
 class SignaturePretrainDataset(Dataset):
     """
-    [LEGACY] Triplet dataset that reads from org_dir / forg_dir directories.
+    [LEGACY] Triplet dataset reading from org_dir / forg_dir directories.
 
-    This class is retained for backward compatibility with directory-based
-    pipelines. The active training pipeline uses SplitTripletDataset (in
-    proposed_cedar.py) which reads from split JSON user dictionaries instead.
-
-    For new experiments, use SplitTripletDataset + sample_augment_params().
+    The active pipeline uses SplitTripletDataset in proposed_cedar.py.
+    Retained for backward compatibility only.
     """
 
     def __init__(self, org_dir, forg_dir, transform=None, user_list=None):
@@ -344,12 +366,12 @@ class SignaturePretrainDataset(Dataset):
     def __getitem__(self, idx):
         anchor_path, pos_path, neg_path = self.triplets[idx]
         anchor_img = Image.open(anchor_path).convert('RGB')
-        pos_img = Image.open(pos_path).convert('RGB')
-        neg_img = Image.open(neg_path).convert('RGB')
+        pos_img    = Image.open(pos_path).convert('RGB')
+        neg_img    = Image.open(neg_path).convert('RGB')
 
         if self.transform:
             anchor = self.transform(anchor_img)
-            pos = self.transform(pos_img)
-            neg = self.transform(neg_img)
+            pos    = self.transform(pos_img)
+            neg    = self.transform(neg_img)
 
         return anchor, pos, neg, torch.tensor([1], dtype=torch.float32)
