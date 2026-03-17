@@ -1,0 +1,577 @@
+{
+  "dataset": "cedar",
+  "n_trials": 40,
+  "epochs_per_trial": 30,
+  "best_val_eer": 0.1740451388888889,
+  "best_params": {
+    "phase1_epochs": 8,
+    "backbone_lr_ratio": 0.12840321847161612,
+    "margin": 0.6708081677140546,
+    "lr": 0.000562339265750289,
+    "weight_decay": 1.610454295493241e-05,
+    "hard_neg_ratio": 0.7675071954842301,
+    "scheduler_patience": 5
+  },
+  "all_trials": [
+    {
+      "number": 0,
+      "value": 0.2387152777777778,
+      "params": {
+        "phase1_epochs": 10,
+        "backbone_lr_ratio": 0.1,
+        "margin": 1.0,
+        "lr": 0.0001,
+        "weight_decay": 0.0001,
+        "hard_neg_ratio": 0.7,
+        "scheduler_patience": 3
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 1,
+      "value": 0.23328993055555555,
+      "params": {
+        "phase1_epochs": 9,
+        "backbone_lr_ratio": 0.19260714596148742,
+        "margin": 1.5979909127171077,
+        "lr": 0.00015751320499779721,
+        "weight_decay": 2.0513382630874486e-05,
+        "hard_neg_ratio": 0.562397808134481,
+        "scheduler_patience": 2
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 2,
+      "value": 0.2528211805555556,
+      "params": {
+        "phase1_epochs": 14,
+        "backbone_lr_ratio": 0.14016725176148134,
+        "margin": 1.5621088666940683,
+        "lr": 1.0994335574766187e-05,
+        "weight_decay": 0.0008706020878304854,
+        "hard_neg_ratio": 0.8329770563201687,
+        "scheduler_patience": 3
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 3,
+      "value": 0.2345920138888889,
+      "params": {
+        "phase1_epochs": 7,
+        "backbone_lr_ratio": 0.07751067647801507,
+        "margin": 0.9563633644393066,
+        "lr": 0.00011207606211860574,
+        "weight_decay": 7.309539835912905e-05,
+        "hard_neg_ratio": 0.6164916560792167,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 4,
+      "value": 0.2228732638888889,
+      "params": {
+        "phase1_epochs": 6,
+        "backbone_lr_ratio": 0.09382169728028272,
+        "margin": 1.0495427649405376,
+        "lr": 8.168455894760161e-05,
+        "weight_decay": 0.00037183641805732076,
+        "hard_neg_ratio": 0.5798695128633439,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 5,
+      "value": 0.2947048611111111,
+      "params": {
+        "phase1_epochs": 11,
+        "backbone_lr_ratio": 0.05696756190799966,
+        "margin": 1.4113172778521577,
+        "lr": 2.1930485556643678e-05,
+        "weight_decay": 1.3492834268013232e-05,
+        "hard_neg_ratio": 0.8795542149013333,
+        "scheduler_patience": 6
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 6,
+      "value": 0.2560763888888889,
+      "params": {
+        "phase1_epochs": 13,
+        "backbone_lr_ratio": 0.09569206537600561,
+        "margin": 0.6465081710095758,
+        "lr": 0.000233596350262616,
+        "weight_decay": 7.591104805282687e-05,
+        "hard_neg_ratio": 0.5488152939379115,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 7,
+      "value": 0.2202690972222222,
+      "params": {
+        "phase1_epochs": 5,
+        "backbone_lr_ratio": 0.18639806031181733,
+        "margin": 0.8881699724000254,
+        "lr": 0.00021137059440645722,
+        "weight_decay": 4.201672054372529e-05,
+        "hard_neg_ratio": 0.7080272084711243,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 8,
+      "value": 0.2816840277777778,
+      "params": {
+        "phase1_epochs": 7,
+        "backbone_lr_ratio": 0.19543769416468382,
+        "margin": 1.6626992350416718,
+        "lr": 0.0007568292060167617,
+        "weight_decay": 0.0006161049539380963,
+        "hard_neg_ratio": 0.739159991524434,
+        "scheduler_patience": 6
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 9,
+      "value": 0.2306857638888889,
+      "params": {
+        "phase1_epochs": 5,
+        "backbone_lr_ratio": 0.07939742936287178,
+        "margin": 0.5678409333658071,
+        "lr": 4.473636174621264e-05,
+        "weight_decay": 5.989003672254293e-05,
+        "hard_neg_ratio": 0.6085396127095584,
+        "scheduler_patience": 6
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 10,
+      "value": 0.3333333333333333,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.1559200477933595,
+        "margin": 1.9543056661817986,
+        "lr": 0.0005507915635283295,
+        "weight_decay": 0.0002012487082975096,
+        "hard_neg_ratio": 0.730083226726109,
+        "scheduler_patience": 2
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 11,
+      "value": 0.2845052083333333,
+      "params": {
+        "phase1_epochs": 5,
+        "backbone_lr_ratio": 0.12388998474406013,
+        "margin": 1.053264822417229,
+        "lr": 0.00030540272189296546,
+        "weight_decay": 0.0002936757379021131,
+        "hard_neg_ratio": 0.6670872303878935,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 12,
+      "value": 0.2287326388888889,
+      "params": {
+        "phase1_epochs": 5,
+        "backbone_lr_ratio": 0.16709769391247323,
+        "margin": 0.7400807719873284,
+        "lr": 4.240660730669041e-05,
+        "weight_decay": 2.8445140427746996e-05,
+        "hard_neg_ratio": 0.518816192533779,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 13,
+      "value": 0.24500868055555555,
+      "params": {
+        "phase1_epochs": 7,
+        "backbone_lr_ratio": 0.12030578283317633,
+        "margin": 1.2431672338264796,
+        "lr": 5.457238135466758e-05,
+        "weight_decay": 0.0003209584308143902,
+        "hard_neg_ratio": 0.8087718335040773,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 14,
+      "value": 0.2065972222222222,
+      "params": {
+        "phase1_epochs": 6,
+        "backbone_lr_ratio": 0.16769618285062232,
+        "margin": 0.8198224215270822,
+        "lr": 0.0003334085624905465,
+        "weight_decay": 3.683113477630362e-05,
+        "hard_neg_ratio": 0.6412662115032848,
+        "scheduler_patience": 3
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 15,
+      "value": 0.37890625,
+      "params": {
+        "phase1_epochs": 12,
+        "backbone_lr_ratio": 0.16732186650271408,
+        "margin": 0.8204565283533763,
+        "lr": 0.0003978457183169225,
+        "weight_decay": 3.368039012826808e-05,
+        "hard_neg_ratio": 0.6653656398770852,
+        "scheduler_patience": 3
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 16,
+      "value": 0.2784288194444444,
+      "params": {
+        "phase1_epochs": 9,
+        "backbone_lr_ratio": 0.1802183629821746,
+        "margin": 1.241667179579247,
+        "lr": 0.0002079970663621355,
+        "weight_decay": 1.1932445603946574e-05,
+        "hard_neg_ratio": 0.6464234334010833,
+        "scheduler_patience": 3
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 17,
+      "value": 0.2183159722222222,
+      "params": {
+        "phase1_epochs": 6,
+        "backbone_lr_ratio": 0.14539254695465292,
+        "margin": 0.8263958143349363,
+        "lr": 0.0009860217251257952,
+        "weight_decay": 3.89420077777908e-05,
+        "hard_neg_ratio": 0.7672232901171483,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 18,
+      "value": 0.2654079861111111,
+      "params": {
+        "phase1_epochs": 15,
+        "backbone_lr_ratio": 0.14389968872397027,
+        "margin": 0.5099410026297955,
+        "lr": 0.0008547904002907203,
+        "weight_decay": 0.0001382160773216116,
+        "hard_neg_ratio": 0.7828777914265405,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 19,
+      "value": 0.20377604166666666,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.14134374205994069,
+        "margin": 0.7210740042407816,
+        "lr": 0.00047183098487993543,
+        "weight_decay": 2.0561758499416543e-05,
+        "hard_neg_ratio": 0.7695335394291838,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 20,
+      "value": 0.2567274305555556,
+      "params": {
+        "phase1_epochs": 9,
+        "backbone_lr_ratio": 0.16947180334131576,
+        "margin": 1.1395199991411409,
+        "lr": 0.0003906029543583402,
+        "weight_decay": 2.3260053624374046e-05,
+        "hard_neg_ratio": 0.8659922044922633,
+        "scheduler_patience": 2
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 21,
+      "value": 0.2150607638888889,
+      "params": {
+        "phase1_epochs": 7,
+        "backbone_lr_ratio": 0.14150398660494057,
+        "margin": 0.7263108124652995,
+        "lr": 0.0009522338284673114,
+        "weight_decay": 4.713116165707245e-05,
+        "hard_neg_ratio": 0.7728160142415937,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 22,
+      "value": 0.1740451388888889,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.12840321847161612,
+        "margin": 0.6708081677140546,
+        "lr": 0.000562339265750289,
+        "weight_decay": 1.610454295493241e-05,
+        "hard_neg_ratio": 0.7675071954842301,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 23,
+      "value": 0.18489583333333334,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.1181658759079116,
+        "margin": 0.6493761157560989,
+        "lr": 0.0005328188412297538,
+        "weight_decay": 1.6688385292962733e-05,
+        "hard_neg_ratio": 0.828702407666566,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 24,
+      "value": 0.20399305555555555,
+      "params": {
+        "phase1_epochs": 10,
+        "backbone_lr_ratio": 0.11252147879320892,
+        "margin": 0.6395775642668066,
+        "lr": 0.0005573880408101596,
+        "weight_decay": 1.7702458992000055e-05,
+        "hard_neg_ratio": 0.8263697364487242,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 25,
+      "value": 0.2814670138888889,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.1326615739953399,
+        "margin": 0.5122311530871693,
+        "lr": 0.0005308377483490089,
+        "weight_decay": 1.1029467287828045e-05,
+        "hard_neg_ratio": 0.8991399682928252,
+        "scheduler_patience": 6
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 26,
+      "value": 0.2730034722222222,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.1098198981988259,
+        "margin": 0.6736492210863897,
+        "lr": 0.000498586322166821,
+        "weight_decay": 1.592460347978402e-05,
+        "hard_neg_ratio": 0.7985352420630938,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 27,
+      "value": 0.28125,
+      "params": {
+        "phase1_epochs": 11,
+        "backbone_lr_ratio": 0.15262004206786056,
+        "margin": 0.9213316830642598,
+        "lr": 0.0006775453478522121,
+        "weight_decay": 1.013622337048005e-05,
+        "hard_neg_ratio": 0.7354916309898789,
+        "scheduler_patience": 6
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 28,
+      "value": 0.212890625,
+      "params": {
+        "phase1_epochs": 9,
+        "backbone_lr_ratio": 0.12897393368183785,
+        "margin": 0.6062789617304019,
+        "lr": 0.00014576291909620238,
+        "weight_decay": 2.593376667390322e-05,
+        "hard_neg_ratio": 0.8502005644003993,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 29,
+      "value": 0.318359375,
+      "params": {
+        "phase1_epochs": 11,
+        "backbone_lr_ratio": 0.10690633011452176,
+        "margin": 0.7735163976147038,
+        "lr": 0.00025811624051328325,
+        "weight_decay": 0.00011595328385020642,
+        "hard_neg_ratio": 0.7626171199488299,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 30,
+      "value": 0.31640625,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.08409706288731227,
+        "margin": 1.1293390775867942,
+        "lr": 0.00041864540794379895,
+        "weight_decay": 1.4921850019048341e-05,
+        "hard_neg_ratio": 0.7082066159252558,
+        "scheduler_patience": 6
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 31,
+      "value": 0.3042534722222222,
+      "params": {
+        "phase1_epochs": 10,
+        "backbone_lr_ratio": 0.11468209967415072,
+        "margin": 0.6764974725559929,
+        "lr": 0.0007170645413967373,
+        "weight_decay": 2.070822249962739e-05,
+        "hard_neg_ratio": 0.8213853849307253,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 32,
+      "value": 0.18836805555555555,
+      "params": {
+        "phase1_epochs": 10,
+        "backbone_lr_ratio": 0.10268272209828476,
+        "margin": 0.6069920430989884,
+        "lr": 0.0005984412738938439,
+        "weight_decay": 1.6894418330526135e-05,
+        "hard_neg_ratio": 0.8407125293289719,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 33,
+      "value": 0.2586805555555556,
+      "params": {
+        "phase1_epochs": 10,
+        "backbone_lr_ratio": 0.13354983895860537,
+        "margin": 0.5038510106670363,
+        "lr": 0.0003148486152232196,
+        "weight_decay": 1.804988069144792e-05,
+        "hard_neg_ratio": 0.8491769900682897,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 34,
+      "value": 0.2960069444444444,
+      "params": {
+        "phase1_epochs": 9,
+        "backbone_lr_ratio": 0.06640535005347378,
+        "margin": 0.5940738471604466,
+        "lr": 0.00014950946855205903,
+        "weight_decay": 2.696952719591201e-05,
+        "hard_neg_ratio": 0.8066323766497776,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 35,
+      "value": 0.2601996527777778,
+      "params": {
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.10566539348397533,
+        "margin": 0.9865446710571909,
+        "lr": 0.0006603486204130938,
+        "weight_decay": 2.1444700897177204e-05,
+        "hard_neg_ratio": 0.7896762699576481,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 36,
+      "value": 0.2651909722222222,
+      "params": {
+        "phase1_epochs": 12,
+        "backbone_lr_ratio": 0.08948616111974539,
+        "margin": 0.7401313091389974,
+        "lr": 9.639182224776382e-05,
+        "weight_decay": 1.3891492314707989e-05,
+        "hard_neg_ratio": 0.8427632788690679,
+        "scheduler_patience": 6
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 37,
+      "value": 0.2604166666666667,
+      "params": {
+        "phase1_epochs": 9,
+        "backbone_lr_ratio": 0.12096923781126077,
+        "margin": 0.8787401281695655,
+        "lr": 0.0004446107868075128,
+        "weight_decay": 5.137767278504895e-05,
+        "hard_neg_ratio": 0.7518908800811432,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 38,
+      "value": 0.2842881944444444,
+      "params": {
+        "phase1_epochs": 6,
+        "backbone_lr_ratio": 0.10103021013847428,
+        "margin": 1.371517019305087,
+        "lr": 1.860678912578863e-05,
+        "weight_decay": 7.594162269539256e-05,
+        "hard_neg_ratio": 0.8748197169373011,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 39,
+      "value": 0.2957899305555556,
+      "params": {
+        "phase1_epochs": 7,
+        "backbone_lr_ratio": 0.1343271217912678,
+        "margin": 1.693921706273572,
+        "lr": 0.00018223107469301085,
+        "weight_decay": 3.219069988790699e-05,
+        "hard_neg_ratio": 0.8970069620179997,
+        "scheduler_patience": 4
+      },
+      "state": "TrialState.PRUNED"
+    }
+  ]
+}
