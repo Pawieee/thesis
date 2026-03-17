@@ -181,13 +181,18 @@ def run_trial(trial, train_dict, val_dict, device,
     """
 
     # ── Suggest hyperparameters ───────────────────────────────────────────────
-    margin            = trial.suggest_float('margin',            0.5,  2.0)
-    lr                = trial.suggest_float('lr',                1e-5, 1e-3,  log=True)
-    weight_decay      = trial.suggest_float('weight_decay',      1e-5, 1e-3,  log=True)
-    phase1_epochs     = trial.suggest_int(  'phase1_epochs',     5,    25)
-    backbone_lr_ratio = trial.suggest_float('backbone_lr_ratio', 0.05, 0.3)
-    hard_neg_ratio    = trial.suggest_float('hard_neg_ratio',    0.5,  0.9)
-    scheduler_patience= trial.suggest_int(  'scheduler_patience',2,    6)
+    # Change phase1_epochs range — current upper bound is too high for 30-epoch trials
+    phase1_epochs = trial.suggest_int('phase1_epochs', 5, 15)  # was 5, 25
+
+    # Optionally narrow backbone_lr_ratio upper bound
+    backbone_lr_ratio = trial.suggest_float('backbone_lr_ratio', 0.05, 0.2)  # was 0.05, 0.3
+
+    # All other ranges are valid — keep as-is
+    margin             = trial.suggest_float('margin',             0.5,  2.0)
+    lr                 = trial.suggest_float('lr',                 1e-5, 1e-3, log=True)
+    weight_decay       = trial.suggest_float('weight_decay',       1e-5, 1e-3, log=True)
+    hard_neg_ratio     = trial.suggest_float('hard_neg_ratio',     0.5,  0.9)
+    scheduler_patience = trial.suggest_int(  'scheduler_patience', 2,    6)
 
     seed_everything(42)
 
@@ -336,6 +341,15 @@ def run_search(args):
         )
 
     t0 = time.time()
+    study.enqueue_trial({
+        'margin':             1.0,
+        'lr':                 1e-4,
+        'weight_decay':       1e-4,
+        'phase1_epochs':      10,    # scaled down from 20 for 30-epoch trials
+        'backbone_lr_ratio':  0.1,
+        'hard_neg_ratio':     0.7,
+        'scheduler_patience': 3
+    })
     study.optimize(
         objective,
         n_trials=args.n_trials,
