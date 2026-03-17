@@ -158,9 +158,10 @@ class DenseNetFeatureExtractor(nn.Module):
     """
 
     def __init__(self, backbone_name='densenet121', output_dim=1024,
-                 pretrained=True, baseline=False):
+                 pretrained=True, baseline=False, normalize=True):
         super().__init__()
         self.baseline = baseline
+        self.normalize = normalize
 
         if backbone_name != 'densenet121':
             raise ValueError(
@@ -241,6 +242,8 @@ class DenseNetFeatureExtractor(nn.Module):
             x = self.avgpool(x)
             x = torch.flatten(x, 1)
             x = self.regularized_dense_block(x)
+            if self.normalize:
+                x = F.normalize(x, p=2, dim=1)
             return x
         else:
             # Stem
@@ -271,7 +274,8 @@ class DenseNetFeatureExtractor(nn.Module):
             x = self.avgpool(x)
             x = torch.flatten(x, 1)
             x = self.regularized_dense_block(x)
-            x = F.normalize(x, p=2, dim=1)
+            if self.normalize:
+                x = F.normalize(x, p=2, dim=1)
             return x
 
     def get_backbone_params(self):
