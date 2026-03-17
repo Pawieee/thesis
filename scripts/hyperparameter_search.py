@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader, Dataset
 from PIL import Image
 import optuna
 from optuna.samplers import TPESampler
+import multiprocessing
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if REPO_ROOT not in sys.path:
@@ -37,6 +38,7 @@ from utils.model_evaluation                    import compute_metrics
 from dataloader.tDCBAM_trainloader             import (get_transforms,
                                                         preprocess_image)
 
+multiprocessing.set_start_method('fork', force=True)
 
 # =============================================================================
 # REPRODUCIBILITY
