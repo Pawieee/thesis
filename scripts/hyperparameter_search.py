@@ -36,7 +36,8 @@ from models.Triplet_Siamese_Similarity_Network import tDCBAM
 from losses.triplet_loss                       import TripletLoss
 from utils.model_evaluation                    import compute_metrics
 from dataloader.tDCBAM_trainloader             import (get_transforms,
-                                                        preprocess_image)
+                                                        preprocess_image,
+                                                        sample_augment_params)
 
 multiprocessing.set_start_method('fork', force=True)
 
@@ -104,14 +105,28 @@ class SplitTripletDataset(Dataset):
         return len(self.triplets)
 
     def __getitem__(self, idx):
-        a, p, n = self.triplets[idx]
+        a_path, p_path, n_path = self.triplets[idx]
+
+        # Flip is sampled ONCE per triplet and shared across all three images.
+        # Rotation, zoom, and jitter are sampled independently per image.
+        # This prevents orientation mismatch within a triplet (which would
+        # corrupt the loss signal) while still forcing spatial invariance
+        # for rotation/scale/position.
+        shared_flip = random.random() < 0.5
+        params_a    = sample_augment_params(shared_flip=shared_flip)
+        params_p    = sample_augment_params(shared_flip=shared_flip)
+        params_n    = sample_augment_params(shared_flip=shared_flip)
+
         return (
-            preprocess_image(Image.open(a).convert('RGB'),
-                             img_size=self.input_shape, augment=True),
-            preprocess_image(Image.open(p).convert('RGB'),
-                             img_size=self.input_shape, augment=True),
-            preprocess_image(Image.open(n).convert('RGB'),
-                             img_size=self.input_shape, augment=True),
+            preprocess_image(Image.open(a_path).convert('RGB'),
+                             img_size=self.input_shape,
+                             augment_params=params_a),
+            preprocess_image(Image.open(p_path).convert('RGB'),
+                             img_size=self.input_shape,
+                             augment_params=params_p),
+            preprocess_image(Image.open(n_path).convert('RGB'),
+                             img_size=self.input_shape,
+                             augment_params=params_n),
             torch.tensor([1], dtype=torch.float32)
         )
 
@@ -181,13 +196,8 @@ def run_trial(trial, train_dict, val_dict, device,
     """
 
     # ── Suggest hyperparameters ───────────────────────────────────────────────
-    # Change phase1_epochs range — current upper bound is too high for 30-epoch trials
-    phase1_epochs = trial.suggest_int('phase1_epochs', 5, 15)  # was 5, 25
-
-    # Optionally narrow backbone_lr_ratio upper bound
-    backbone_lr_ratio = trial.suggest_float('backbone_lr_ratio', 0.05, 0.2)  # was 0.05, 0.3
-
-    # All other ranges are valid — keep as-is
+    phase1_epochs      = trial.suggest_int(  'phase1_epochs',      5,    15)
+    backbone_lr_ratio  = trial.suggest_float('backbone_lr_ratio',  0.05, 0.2)
     margin             = trial.suggest_float('margin',             0.5,  2.0)
     lr                 = trial.suggest_float('lr',                 1e-5, 1e-3, log=True)
     weight_decay       = trial.suggest_float('weight_decay',       1e-5, 1e-3, log=True)
@@ -310,20 +320,15 @@ def run_search(args):
     print(f"  Device: {device}")
     print(f"{'='*60}\n")
 
-    # TPE sampler (Tree-structured Parzen Estimator) — the standard
-    # Bayesian optimization algorithm in Optuna. Uses past trial results
-    # to model the probability of good hyperparameter values.
-    # MedianPruner stops trials that are underperforming at each epoch
-    # checkpoint relative to the median of completed trials — saves compute.
     sampler = TPESampler(seed=42)
     pruner  = optuna.pruners.MedianPruner(
-        n_startup_trials=5,    # do not prune until 5 trials complete
-        n_warmup_steps=10,     # do not prune before epoch 10
-        interval_steps=3       # check for pruning every 3 epochs
+        n_startup_trials=5,
+        n_warmup_steps=10,
+        interval_steps=3
     )
 
     study = optuna.create_study(
-        direction='minimize',       # minimize val EER
+        direction='minimize',
         sampler=sampler,
         pruner=pruner,
         study_name=f'tDCBAM_{args.dataset}'
@@ -345,7 +350,7 @@ def run_search(args):
         'margin':             1.0,
         'lr':                 1e-4,
         'weight_decay':       1e-4,
-        'phase1_epochs':      10,    # scaled down from 20 for 30-epoch trials
+        'phase1_epochs':      10,
         'backbone_lr_ratio':  0.1,
         'hard_neg_ratio':     0.7,
         'scheduler_patience': 3
@@ -369,17 +374,17 @@ def run_search(args):
 
     # ── Save results ──────────────────────────────────────────────────────────
     results = {
-        'dataset':         args.dataset,
-        'n_trials':        args.n_trials,
-        'epochs_per_trial':args.epochs_per_trial,
-        'best_val_eer':    best.value,
-        'best_params':     best.params,
+        'dataset':          args.dataset,
+        'n_trials':         args.n_trials,
+        'epochs_per_trial': args.epochs_per_trial,
+        'best_val_eer':     best.value,
+        'best_params':      best.params,
         'all_trials': [
             {
-                'number':  t.number,
-                'value':   t.value,
-                'params':  t.params,
-                'state':   str(t.state)
+                'number': t.number,
+                'value':  t.value,
+                'params': t.params,
+                'state':  str(t.state)
             }
             for t in study.trials
         ]
@@ -394,7 +399,6 @@ def run_search(args):
     # ── Optuna visualization ──────────────────────────────────────────────────
     try:
         import optuna.visualization as vis
-        import plotly.io as pio
 
         fig1 = vis.plot_optimization_history(study)
         fig1.write_image(os.path.join(
@@ -427,17 +431,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='Bayesian hyperparameter search for tDCBAM'
     )
-    parser.add_argument('--dataset',          type=str,   required=True,
+    parser.add_argument('--dataset',          type=str, required=True,
                         help='Dataset name (cedar / bhsig_bengali / bhsig_hindi)')
-    parser.add_argument('--split_file',       type=str,   required=True,
+    parser.add_argument('--split_file',       type=str, required=True,
                         help='Path to split JSON file')
-    parser.add_argument('--n_trials',         type=int,   default=40,
+    parser.add_argument('--n_trials',         type=int, default=40,
                         help='Number of Optuna trials (default: 40)')
-    parser.add_argument('--epochs_per_trial', type=int,   default=30,
+    parser.add_argument('--epochs_per_trial', type=int, default=30,
                         help='Training epochs per trial (default: 30)')
-    parser.add_argument('--output_dir',       type=str,   default='checkpoints/hparam_search',
+    parser.add_argument('--output_dir',       type=str,
+                        default='checkpoints/hparam_search',
                         help='Directory to save search results')
-    parser.add_argument('--num_workers',      type=int,   default=4)
+    parser.add_argument('--num_workers',      type=int, default=4)
     args = parser.parse_args()
 
     best_params = run_search(args)
