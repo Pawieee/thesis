@@ -6,14 +6,14 @@
 #       --dataset cedar \
 #       --split_file data/ratio_splits/cedar_split_70_15_15.json \
 #       --n_trials 40 \
-#       --epochs_per_trial 30 \
+#       --epochs_per_trial 100 \
 #       --output_dir checkpoints/hparam_search
 #
 # Strategy:
-#   Each trial trains for a reduced epoch budget (default 30) — enough to
-#   observe the trajectory without running to full convergence. The best
-#   configuration found is then used for the full 100-epoch training run.
-#   Val EER at the end of each trial is the optimization objective (minimize).
+#   Trials are given a full epoch budget (e.g., 100). Termination is handled
+#   dynamically by early stopping when the TripletLoss active fraction drops 
+#   near zero (margin satisfied). Unpromising trials are aggressively pruned 
+#   by Optuna's MedianPruner based on intermediate validation EER.
 # =============================================================================
 
 import os, sys, json, random, argparse, time
@@ -56,7 +56,7 @@ def seed_everything(seed=42):
 
 
 # =============================================================================
-# DATASET — inline copies to keep this script self-contained
+# DATASET
 # =============================================================================
 
 class SplitTripletDataset(Dataset):
@@ -71,10 +71,8 @@ class SplitTripletDataset(Dataset):
         self.all_genuine_paths = []
 
         for uid, data in user_dict.items():
-            gen_key  = next((k for k in data if k.lower() in
-                             ('genuine', 'gen')), None)
-            forg_key = next((k for k in data if k.lower() in
-                             ('forged', 'forgeries', 'forg')), None)
+            gen_key  = next((k for k in data if k.lower() in ('genuine', 'gen')), None)
+            forg_key = next((k for k in data if k.lower() in ('forged', 'forgeries', 'forg')), None)
             gen_paths  = data.get(gen_key,  []) if gen_key  else []
             forg_paths = data.get(forg_key, []) if forg_key else []
             if len(gen_paths) >= 2:
@@ -88,12 +86,12 @@ class SplitTripletDataset(Dataset):
     def _generate_triplets(self):
         self.triplets = []
         for anchor_path, uid in self.all_genuine_paths:
-            positives = [p for p in self.user_genuine_map[uid]
-                         if p != anchor_path]
+            positives = [p for p in self.user_genuine_map[uid] if p != anchor_path]
             if not positives:
                 continue
             pos_path  = random.choice(positives)
             forgeries = self.user_forged_map.get(uid, [])
+            
             if random.random() < self.hard_neg_ratio and forgeries:
                 neg_path = random.choice(forgeries)
             else:
@@ -107,26 +105,15 @@ class SplitTripletDataset(Dataset):
     def __getitem__(self, idx):
         a_path, p_path, n_path = self.triplets[idx]
 
-        # Flip is sampled ONCE per triplet and shared across all three images.
-        # Rotation, zoom, and jitter are sampled independently per image.
-        # This prevents orientation mismatch within a triplet (which would
-        # corrupt the loss signal) while still forcing spatial invariance
-        # for rotation/scale/position.
         shared_flip = random.random() < 0.5
         params_a    = sample_augment_params(shared_flip=shared_flip)
         params_p    = sample_augment_params(shared_flip=shared_flip)
         params_n    = sample_augment_params(shared_flip=shared_flip)
 
         return (
-            preprocess_image(Image.open(a_path).convert('RGB'),
-                             img_size=self.input_shape,
-                             augment_params=params_a),
-            preprocess_image(Image.open(p_path).convert('RGB'),
-                             img_size=self.input_shape,
-                             augment_params=params_p),
-            preprocess_image(Image.open(n_path).convert('RGB'),
-                             img_size=self.input_shape,
-                             augment_params=params_n),
+            preprocess_image(Image.open(a_path).convert('RGB'), img_size=self.input_shape, augment_params=params_a),
+            preprocess_image(Image.open(p_path).convert('RGB'), img_size=self.input_shape, augment_params=params_p),
+            preprocess_image(Image.open(n_path).convert('RGB'), img_size=self.input_shape, augment_params=params_n),
             torch.tensor([1], dtype=torch.float32)
         )
 
@@ -138,10 +125,8 @@ class SplitPairDataset(Dataset):
         self.pairs       = []
 
         for uid, data in user_dict.items():
-            gen_key  = next((k for k in data if k.lower() in
-                             ('genuine', 'gen')), None)
-            forg_key = next((k for k in data if k.lower() in
-                             ('forged', 'forgeries', 'forg')), None)
+            gen_key  = next((k for k in data if k.lower() in ('genuine', 'gen')), None)
+            forg_key = next((k for k in data if k.lower() in ('forged', 'forgeries', 'forg')), None)
             gen_paths  = data.get(gen_key,  []) if gen_key  else []
             forg_paths = data.get(forg_key, []) if forg_key else []
             for i in range(len(gen_paths)):
@@ -156,8 +141,7 @@ class SplitPairDataset(Dataset):
 
     def __getitem__(self, idx):
         s, q, label = self.pairs[idx]
-        return (self._load(s), self._load(q),
-                torch.tensor(label, dtype=torch.float32))
+        return (self._load(s), self._load(q), torch.tensor(label, dtype=torch.float32))
 
     def _load(self, path):
         img = Image.open(path).convert('RGB')
@@ -181,41 +165,32 @@ def validate(fe, loader, device):
             scores = 1.0 - (dist / 4.0)
             all_scores.extend(scores.cpu().numpy().tolist())
             all_labels.extend(labels.numpy().tolist())
-    return compute_metrics(all_labels, all_scores)
+    return compute_metrics(all_labels, all_scores, return_curve_data=False)
 
 
 # =============================================================================
-# SINGLE TRIAL TRAINING
+# OPTUNA TRIAL TRAINING LOOP
 # =============================================================================
 
-def run_trial(trial, train_dict, val_dict, device,
-              input_shape, epochs, num_workers):
-    """
-    Train for one Optuna trial with the suggested hyperparameters.
-    Returns val EER — the objective to minimize.
-    """
-
-    # ── Suggest hyperparameters ───────────────────────────────────────────────
-    phase1_epochs      = trial.suggest_int(  'phase1_epochs',      5,    15)
-    backbone_lr_ratio  = trial.suggest_float('backbone_lr_ratio',  0.05, 0.2)
-    margin             = trial.suggest_float('margin',             0.5,  2.0)
-    lr                 = trial.suggest_float('lr',                 1e-5, 1e-3, log=True)
-    weight_decay       = trial.suggest_float('weight_decay',       1e-5, 1e-3, log=True)
-    hard_neg_ratio     = trial.suggest_float('hard_neg_ratio',     0.5,  0.9)
-    scheduler_patience = trial.suggest_int(  'scheduler_patience', 2,    6)
-
+def run_training_for_optuna(trial, train_user_dict, val_user_dict, device, input_shape, num_workers,
+                            lr, margin, weight_decay, phase1_epochs,
+                            backbone_lr_ratio, hard_neg_ratio,
+                            scheduler_patience, epochs, zero_active_patience):
+    
     seed_everything(42)
+    VAL_EVERY = 3
+    zero_active_counter = 0
+    best_eer = float('inf')
 
+    # ── Transforms & Datasets ─────────────────────────────────────────────────
     val_transform = get_transforms(mode='val', input_shape=input_shape)
 
     train_dataset = SplitTripletDataset(
-        train_dict, input_shape=input_shape,
-        val_transform=val_transform,
-        hard_neg_ratio=hard_neg_ratio
+        train_user_dict, input_shape=input_shape,
+        val_transform=val_transform, hard_neg_ratio=hard_neg_ratio
     )
     val_dataset = SplitPairDataset(
-        val_dict, input_shape=input_shape,
-        transform=val_transform
+        val_user_dict, input_shape=input_shape, transform=val_transform
     )
 
     train_loader = DataLoader(
@@ -229,21 +204,19 @@ def run_trial(trial, train_dict, val_dict, device,
         persistent_workers=(num_workers > 0)
     )
 
-    model     = tDCBAM(backbone_name='densenet121',
-                       output_dim=1024, pretrained=True).to(device)
+    # ── Model Initialization ──────────────────────────────────────────────────
+    model     = tDCBAM(backbone_name='densenet121', output_dim=1024, pretrained=True).to(device)
     criterion = TripletLoss(margin=margin, mode='euclidean')
     scaler    = torch.amp.GradScaler('cuda')
 
-    # Phase 1 — frozen backbone
+    # ── Phase 1 Setup ─────────────────────────────────────────────────────────
     for p in model.feature_extractor.get_backbone_params():
         p.requires_grad = False
 
-    optimizer = optim.AdamW(
-        model.get_head_params(), lr=lr, weight_decay=weight_decay
-    )
+    optimizer = optim.AdamW(model.get_head_params(), lr=lr, weight_decay=weight_decay)
     scheduler = None
-    best_val_eer = float('inf')
 
+    # ── Training Loop ─────────────────────────────────────────────────────────
     for epoch in range(epochs):
 
         # Phase transition
@@ -251,21 +224,19 @@ def run_trial(trial, train_dict, val_dict, device,
             for p in model.feature_extractor.parameters():
                 p.requires_grad = True
             optimizer = optim.AdamW([
-                {'params': model.get_backbone_params(),
-                 'lr': lr * backbone_lr_ratio},
+                {'params': model.get_backbone_params(), 'lr': lr * backbone_lr_ratio},
                 {'params': model.get_head_params(), 'lr': lr}
             ], weight_decay=weight_decay)
             scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5,
-                patience=scheduler_patience, min_lr=1e-6
+                optimizer, mode='min', factor=0.5, patience=scheduler_patience, min_lr=1e-6
             )
 
-        # Train one epoch
         model.train()
         for anchor, pos, neg, _ in train_loader:
             anchor = anchor.to(device, non_blocking=True)
             pos    = pos.to(device,    non_blocking=True)
             neg    = neg.to(device,    non_blocking=True)
+            
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast('cuda'):
                 loss = criterion(*model(anchor, pos, neg))
@@ -275,11 +246,9 @@ def run_trial(trial, train_dict, val_dict, device,
 
         train_dataset._generate_triplets()
 
-        # Validate every 3 epochs and on the last epoch
-        should_validate = (
-            (epoch + 1) % 3 == 0 or
-            (epoch + 1) == epochs
-        )
+        # ── Periodic Validation & Optuna Logic ────────────────────────────────
+        should_validate = ((epoch + 1) % VAL_EVERY == 0 or (epoch + 1) == epochs)
+        
         if should_validate:
             val_metrics = validate(model.feature_extractor, val_loader, device)
             val_eer     = val_metrics['eer']
@@ -287,15 +256,24 @@ def run_trial(trial, train_dict, val_dict, device,
             if scheduler is not None:
                 scheduler.step(val_eer)
 
-            if val_eer < best_val_eer:
-                best_val_eer = val_eer
-
-            # Optuna pruning — stop unpromising trials early
+            # Report to Optuna for Median Pruning
             trial.report(val_eer, epoch)
             if trial.should_prune():
                 raise optuna.exceptions.TrialPruned()
 
-    return best_val_eer
+            if val_eer < best_eer:
+                best_eer = val_eer
+
+            # ── Active fraction early stopping ────────────────────────────────
+            if epoch >= phase1_epochs:
+                if criterion.last_fraction_active < 0.01:
+                    zero_active_counter += 1
+                    if zero_active_counter >= zero_active_patience:
+                        break
+                else:
+                    zero_active_counter = 0
+
+    return best_eer
 
 
 # =============================================================================
@@ -316,7 +294,7 @@ def run_search(args):
 
     print(f"\n{'='*60}")
     print(f"  Hyperparameter Search — {args.dataset.upper()}")
-    print(f"  Trials: {args.n_trials} | Epochs/trial: {args.epochs_per_trial}")
+    print(f"  Trials: {args.n_trials} | Max Epochs/trial: {args.epochs_per_trial}")
     print(f"  Device: {device}")
     print(f"{'='*60}\n")
 
@@ -335,17 +313,41 @@ def run_search(args):
     )
 
     def objective(trial):
-        return run_trial(
+        # ── Sample hyperparameters ────────────────────────────────────────────
+        lr                 = trial.suggest_float('lr',                1e-5, 1e-3, log=True)
+        margin             = trial.suggest_float('margin',            0.5,  2.0)
+        weight_decay       = trial.suggest_float('weight_decay',      1e-5, 1e-3, log=True)
+        phase1_epochs      = trial.suggest_int(  'phase1_epochs',     5,    15)
+        backbone_lr_ratio  = trial.suggest_float('backbone_lr_ratio', 0.05, 0.2)
+        hard_neg_ratio     = trial.suggest_float('hard_neg_ratio',    0.5,  0.9)
+        scheduler_patience = trial.suggest_int(  'scheduler_patience',2,    6)
+
+        # ── Run full training with early stopping ─────────────────────────────
+        # No fixed epoch cap per trial — early stopping handles termination.
+        # zero_active_patience=5 stops when the model has no learning signal.
+        # This guarantees Optuna sees the true best val EER for each config.
+        best_val_eer = run_training_for_optuna(
             trial=trial,
-            train_dict=train_dict,
-            val_dict=val_dict,
+            train_user_dict=train_dict,
+            val_user_dict=val_dict,
             device=device,
             input_shape=input_shape,
-            epochs=args.epochs_per_trial,
-            num_workers=args.num_workers
+            num_workers=args.num_workers,
+            lr=lr,
+            margin=margin,
+            weight_decay=weight_decay,
+            phase1_epochs=phase1_epochs,
+            backbone_lr_ratio=backbone_lr_ratio,
+            hard_neg_ratio=hard_neg_ratio,
+            scheduler_patience=scheduler_patience,
+            epochs=args.epochs_per_trial,   # full budget — early stopping cuts it short
+            zero_active_patience=5,         # stops when no learning signal remains
         )
+        return best_val_eer
 
     t0 = time.time()
+    
+    # Enqueue a baseline conservative start point
     study.enqueue_trial({
         'margin':             1.0,
         'lr':                 1e-4,
@@ -355,6 +357,7 @@ def run_search(args):
         'hard_neg_ratio':     0.7,
         'scheduler_patience': 3
     })
+    
     study.optimize(
         objective,
         n_trials=args.n_trials,
@@ -437,8 +440,8 @@ if __name__ == '__main__':
                         help='Path to split JSON file')
     parser.add_argument('--n_trials',         type=int, default=40,
                         help='Number of Optuna trials (default: 40)')
-    parser.add_argument('--epochs_per_trial', type=int, default=30,
-                        help='Training epochs per trial (default: 30)')
+    parser.add_argument('--epochs_per_trial', type=int, default=100,
+                        help='Maximum training epochs per trial (default: 100)')
     parser.add_argument('--output_dir',       type=str,
                         default='checkpoints/hparam_search',
                         help='Directory to save search results')
