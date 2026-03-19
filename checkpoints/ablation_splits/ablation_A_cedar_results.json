@@ -1,0 +1,17 @@
+{
+  "CEDAR (70:15:15)": {
+    "dataset": "CEDAR",
+    "split": "70:15:15",
+    "ablation": "A \u2014 CBAM only (classification)",
+    "train_users": 38,
+    "val_users": 8,
+    "test_users": 9,
+    "eer": 0.2777777777777778,
+    "accuracy": 0.7222222222222222,
+    "auc": 0.7930598422496572,
+    "precision": 0.7222222222222222,
+    "recall": 0.7222222222222222,
+    "f1": 0.7222222222222222,
+    "train_time_seconds": 87.86
+  }
+}

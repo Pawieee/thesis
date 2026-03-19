@@ -11,6 +11,34 @@
     "precision": 0.7069767441860465,
     "recall": 0.7037037037037037,
     "f1": 0.7053364269141531,
-    "train_time_seconds": 58.3
+    "train_time_seconds": 57.43
+  },
+  "CEDAR (65:18:18)": {
+    "dataset": "CEDAR",
+    "split": "65:18:18",
+    "train_users": 35,
+    "val_users": 9,
+    "test_users": 11,
+    "eer": 0.23106060606060605,
+    "accuracy": 0.7689393939393939,
+    "auc": 0.8134684917355371,
+    "precision": 0.7689393939393939,
+    "recall": 0.7689393939393939,
+    "f1": 0.7689393939393939,
+    "train_time_seconds": 114.55
+  },
+  "CEDAR (60:20:20)": {
+    "dataset": "CEDAR",
+    "split": "60:20:20",
+    "train_users": 33,
+    "val_users": 11,
+    "test_users": 11,
+    "eer": 0.2840909090909091,
+    "accuracy": 0.7196969696969697,
+    "auc": 0.7594840449954087,
+    "precision": 0.7180451127819549,
+    "recall": 0.7234848484848485,
+    "f1": 0.720754716981132,
+    "train_time_seconds": 115.03
   }
 }

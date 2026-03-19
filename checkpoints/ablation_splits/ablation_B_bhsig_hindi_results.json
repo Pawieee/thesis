@@ -1,0 +1,17 @@
+{
+  "BHSig-Hindi (70:15:15)": {
+    "dataset": "BHSig-Hindi",
+    "split": "70:15:15",
+    "ablation": "B \u2014 Triplet only (no CBAM)",
+    "train_users": 112,
+    "val_users": 24,
+    "test_users": 24,
+    "eer": 0.15839120370370371,
+    "accuracy": 0.8416164658634538,
+    "auc": 0.9148988115956008,
+    "precision": 0.6707170356111646,
+    "recall": 0.8416364734299517,
+    "f1": 0.7465184788430638,
+    "train_time_seconds": 2208.72
+  }
+}
