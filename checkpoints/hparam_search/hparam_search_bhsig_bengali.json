@@ -1,27 +1,27 @@
 {
   "dataset": "bhsig_bengali",
-  "n_trials": 40,
-  "epochs_per_trial": 30,
-  "best_val_eer": 0.11120370370370371,
+  "n_trials": 30,
+  "epochs_per_trial": 100,
+  "best_val_eer": 0.11898148148148148,
   "best_params": {
-    "phase1_epochs": 13,
-    "backbone_lr_ratio": 0.12419664521330814,
-    "margin": 0.5197650986950104,
-    "lr": 0.0007180493340227167,
-    "weight_decay": 0.0001776357899568488,
-    "hard_neg_ratio": 0.5095840184609381,
-    "scheduler_patience": 5
+    "lr": 0.000960311741926896,
+    "margin": 1.3494718222576336,
+    "weight_decay": 0.0008336515400731112,
+    "phase1_epochs": 14,
+    "backbone_lr_ratio": 0.1399304427673029,
+    "hard_neg_ratio": 0.5047199957300887,
+    "scheduler_patience": 2
   },
   "all_trials": [
     {
       "number": 0,
-      "value": 0.23296296296296296,
+      "value": 0.20666666666666667,
       "params": {
+        "lr": 0.0001,
+        "margin": 1.0,
+        "weight_decay": 0.0001,
         "phase1_epochs": 10,
         "backbone_lr_ratio": 0.1,
-        "margin": 1.0,
-        "lr": 0.0001,
-        "weight_decay": 0.0001,
         "hard_neg_ratio": 0.7,
         "scheduler_patience": 3
       },
@@ -29,13 +29,13 @@
     },
     {
       "number": 1,
-      "value": 0.18583333333333332,
+      "value": 0.26481481481481484,
       "params": {
-        "phase1_epochs": 9,
-        "backbone_lr_ratio": 0.19260714596148742,
-        "margin": 1.5979909127171077,
-        "lr": 0.00015751320499779721,
-        "weight_decay": 2.0513382630874486e-05,
+        "lr": 5.6115164153345e-05,
+        "margin": 1.9260714596148742,
+        "weight_decay": 0.000291063591313307,
+        "phase1_epochs": 11,
+        "backbone_lr_ratio": 0.07340279606636549,
         "hard_neg_ratio": 0.562397808134481,
         "scheduler_patience": 2
       },
@@ -43,13 +43,13 @@
     },
     {
       "number": 2,
-      "value": 0.31,
+      "value": 0.1489814814814815,
       "params": {
-        "phase1_epochs": 14,
-        "backbone_lr_ratio": 0.14016725176148134,
-        "margin": 1.5621088666940683,
-        "lr": 1.0994335574766187e-05,
-        "weight_decay": 0.0008706020878304854,
+        "lr": 0.0005399484409787432,
+        "margin": 1.4016725176148133,
+        "weight_decay": 0.0002607024758370766,
+        "phase1_epochs": 5,
+        "backbone_lr_ratio": 0.19548647782429918,
         "hard_neg_ratio": 0.8329770563201687,
         "scheduler_patience": 3
       },
@@ -57,13 +57,13 @@
     },
     {
       "number": 3,
-      "value": 0.16833333333333333,
+      "value": 0.21407407407407408,
       "params": {
-        "phase1_epochs": 7,
-        "backbone_lr_ratio": 0.07751067647801507,
-        "margin": 0.9563633644393066,
-        "lr": 0.00011207606211860574,
-        "weight_decay": 7.309539835912905e-05,
+        "lr": 2.3102018878452926e-05,
+        "margin": 0.7751067647801507,
+        "weight_decay": 4.059611610484306e-05,
+        "phase1_epochs": 10,
+        "backbone_lr_ratio": 0.11479175279631737,
         "hard_neg_ratio": 0.6164916560792167,
         "scheduler_patience": 5
       },
@@ -71,13 +71,13 @@
     },
     {
       "number": 4,
-      "value": 0.19268518518518518,
+      "value": 0.18953703703703703,
       "params": {
-        "phase1_epochs": 6,
-        "backbone_lr_ratio": 0.09382169728028272,
-        "margin": 1.0495427649405376,
-        "lr": 8.168455894760161e-05,
-        "weight_decay": 0.00037183641805732076,
+        "lr": 1.9010245319870364e-05,
+        "margin": 0.9382169728028272,
+        "weight_decay": 5.4041038546473305e-05,
+        "phase1_epochs": 10,
+        "backbone_lr_ratio": 0.16777639420895207,
         "hard_neg_ratio": 0.5798695128633439,
         "scheduler_patience": 4
       },
@@ -85,13 +85,13 @@
     },
     {
       "number": 5,
-      "value": 0.30583333333333335,
+      "value": 0.26935185185185184,
       "params": {
-        "phase1_epochs": 11,
-        "backbone_lr_ratio": 0.05696756190799966,
-        "margin": 1.4113172778521577,
-        "lr": 2.1930485556643678e-05,
-        "weight_decay": 1.3492834268013232e-05,
+        "lr": 0.00015304852121831474,
+        "margin": 0.5696756190799965,
+        "weight_decay": 0.000164092867306479,
+        "phase1_epochs": 6,
+        "backbone_lr_ratio": 0.05975773894779193,
         "hard_neg_ratio": 0.8795542149013333,
         "scheduler_patience": 6
       },
@@ -99,13 +99,13 @@
     },
     {
       "number": 6,
-      "value": 0.1387962962962963,
+      "value": 0.13157407407407407,
       "params": {
-        "phase1_epochs": 13,
-        "backbone_lr_ratio": 0.09569206537600561,
-        "margin": 0.6465081710095758,
-        "lr": 0.000233596350262616,
-        "weight_decay": 7.591104805282687e-05,
+        "lr": 0.0004138040112561013,
+        "margin": 0.9569206537600561,
+        "weight_decay": 1.5679933916722995e-05,
+        "phase1_epochs": 12,
+        "backbone_lr_ratio": 0.11602287406094021,
         "hard_neg_ratio": 0.5488152939379115,
         "scheduler_patience": 4
       },
@@ -113,41 +113,41 @@
     },
     {
       "number": 7,
-      "value": 0.14592592592592593,
+      "value": 0.3249074074074074,
       "params": {
-        "phase1_epochs": 5,
-        "backbone_lr_ratio": 0.18639806031181733,
-        "margin": 0.8881699724000254,
-        "lr": 0.00021137059440645722,
-        "weight_decay": 4.201672054372529e-05,
+        "lr": 1.1715937392307055e-05,
+        "margin": 1.8639806031181732,
+        "weight_decay": 3.292759134423613e-05,
+        "phase1_epochs": 12,
+        "backbone_lr_ratio": 0.09675666141341166,
         "hard_neg_ratio": 0.7080272084711243,
         "scheduler_patience": 4
       },
-      "state": "TrialState.COMPLETE"
+      "state": "TrialState.PRUNED"
     },
     {
       "number": 8,
-      "value": 0.125,
+      "value": 0.3226851851851852,
       "params": {
-        "phase1_epochs": 7,
-        "backbone_lr_ratio": 0.19543769416468382,
-        "margin": 1.6626992350416718,
-        "lr": 0.0007568292060167617,
-        "weight_decay": 0.0006161049539380963,
+        "lr": 2.3426581058204037e-05,
+        "margin": 1.9543769416468377,
+        "weight_decay": 0.0003550304858128307,
+        "phase1_epochs": 15,
+        "backbone_lr_ratio": 0.18422410256414734,
         "hard_neg_ratio": 0.739159991524434,
         "scheduler_patience": 6
       },
-      "state": "TrialState.COMPLETE"
+      "state": "TrialState.PRUNED"
     },
     {
       "number": 9,
-      "value": 0.3244444444444444,
+      "value": 0.3258333333333333,
       "params": {
-        "phase1_epochs": 5,
-        "backbone_lr_ratio": 0.07939742936287178,
-        "margin": 0.5678409333658071,
-        "lr": 4.473636174621264e-05,
-        "weight_decay": 5.989003672254293e-05,
+        "lr": 1.5030900645056805e-05,
+        "margin": 0.7939742936287177,
+        "weight_decay": 1.2315571723666024e-05,
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.10830159345342232,
         "hard_neg_ratio": 0.6085396127095584,
         "scheduler_patience": 6
       },
@@ -155,423 +155,283 @@
     },
     {
       "number": 10,
-      "value": 0.16305555555555556,
+      "value": 0.12583333333333332,
       "params": {
-        "phase1_epochs": 8,
-        "backbone_lr_ratio": 0.15498125148823966,
-        "margin": 1.9543056661817986,
-        "lr": 0.0008133545002715511,
-        "weight_decay": 0.0002693637964282296,
-        "hard_neg_ratio": 0.769059422614628,
-        "scheduler_patience": 5
+        "lr": 0.0008971270805430311,
+        "margin": 1.3599205743618352,
+        "weight_decay": 0.0008691089486124979,
+        "phase1_epochs": 14,
+        "backbone_lr_ratio": 0.1477799826167268,
+        "hard_neg_ratio": 0.5154900799844732,
+        "scheduler_patience": 2
       },
       "state": "TrialState.COMPLETE"
     },
     {
       "number": 11,
-      "value": 0.11120370370370371,
+      "value": 0.13462962962962963,
       "params": {
-        "phase1_epochs": 13,
-        "backbone_lr_ratio": 0.12419664521330814,
-        "margin": 0.5197650986950104,
-        "lr": 0.0007180493340227167,
-        "weight_decay": 0.0001776357899568488,
+        "lr": 0.0009130548441531748,
+        "margin": 1.3558217973225248,
+        "weight_decay": 0.0009808409688670614,
+        "phase1_epochs": 14,
+        "backbone_lr_ratio": 0.14261817094895315,
         "hard_neg_ratio": 0.5095840184609381,
-        "scheduler_patience": 5
+        "scheduler_patience": 2
       },
       "state": "TrialState.COMPLETE"
     },
     {
       "number": 12,
-      "value": 0.25342592592592594,
+      "value": 0.27361111111111114,
       "params": {
-        "phase1_epochs": 15,
-        "backbone_lr_ratio": 0.1631969914658679,
-        "margin": 1.9297699070300725,
-        "lr": 0.0009913987763116138,
-        "weight_decay": 0.00023880083054853718,
-        "hard_neg_ratio": 0.5026261647115593,
-        "scheduler_patience": 5
+        "lr": 0.00033185054503947445,
+        "margin": 1.5719097772890334,
+        "weight_decay": 1.051670929266633e-05,
+        "phase1_epochs": 13,
+        "backbone_lr_ratio": 0.13833392117055007,
+        "hard_neg_ratio": 0.5015644496760215,
+        "scheduler_patience": 3
       },
       "state": "TrialState.PRUNED"
     },
     {
       "number": 13,
-      "value": 0.26287037037037037,
+      "value": 0.22870370370370371,
       "params": {
-        "phase1_epochs": 12,
-        "backbone_lr_ratio": 0.12030578283317633,
-        "margin": 1.2794227011510744,
-        "lr": 0.00042376953683793115,
-        "weight_decay": 0.0008941699882477623,
-        "hard_neg_ratio": 0.6908529712104678,
-        "scheduler_patience": 6
+        "lr": 0.00028595773339277136,
+        "margin": 1.1396428577803943,
+        "weight_decay": 0.0006943770385509277,
+        "phase1_epochs": 15,
+        "backbone_lr_ratio": 0.15633460190366938,
+        "hard_neg_ratio": 0.6529362936049039,
+        "scheduler_patience": 5
       },
       "state": "TrialState.PRUNED"
     },
     {
       "number": 14,
-      "value": 0.22694444444444445,
+      "value": 0.1687962962962963,
       "params": {
-        "phase1_epochs": 10,
-        "backbone_lr_ratio": 0.12330465758409949,
-        "margin": 1.714949191544814,
-        "lr": 0.0004588097383232645,
-        "weight_decay": 0.00044342495827720736,
-        "hard_neg_ratio": 0.7720858154412511,
+        "lr": 0.0009564762352189135,
+        "margin": 1.6432867255033707,
+        "weight_decay": 1.7946083660576663e-05,
+        "phase1_epochs": 13,
+        "backbone_lr_ratio": 0.12697210748794394,
+        "hard_neg_ratio": 0.5417898935091637,
+        "scheduler_patience": 2
+      },
+      "state": "TrialState.COMPLETE"
+    },
+    {
+      "number": 15,
+      "value": 0.2549074074074074,
+      "params": {
+        "lr": 0.00042980109109734164,
+        "margin": 1.2316890786271817,
+        "weight_decay": 0.0001095522074837007,
+        "phase1_epochs": 12,
+        "backbone_lr_ratio": 0.08156441422080118,
+        "hard_neg_ratio": 0.6495596323022259,
         "scheduler_patience": 5
       },
       "state": "TrialState.PRUNED"
     },
     {
-      "number": 15,
-      "value": 0.14925925925925926,
-      "params": {
-        "phase1_epochs": 12,
-        "backbone_lr_ratio": 0.15947522442975526,
-        "margin": 0.7694855168803711,
-        "lr": 0.0004664367761895276,
-        "weight_decay": 0.0001850993616792948,
-        "hard_neg_ratio": 0.6526396571476679,
-        "scheduler_patience": 6
-      },
-      "state": "TrialState.COMPLETE"
-    },
-    {
       "number": 16,
-      "value": 0.1250925925925926,
+      "value": 0.2753703703703704,
       "params": {
-        "phase1_epochs": 8,
-        "backbone_lr_ratio": 0.17980885155836848,
-        "margin": 1.2084829425008021,
-        "lr": 0.0006374160439833487,
-        "weight_decay": 0.0001442554065073416,
-        "hard_neg_ratio": 0.5018305851412331,
-        "scheduler_patience": 5
+        "lr": 0.000229367162117522,
+        "margin": 1.0774518546835796,
+        "weight_decay": 6.438797617963598e-05,
+        "phase1_epochs": 13,
+        "backbone_lr_ratio": 0.16310420714057614,
+        "hard_neg_ratio": 0.5457673718967141,
+        "scheduler_patience": 3
       },
-      "state": "TrialState.COMPLETE"
+      "state": "TrialState.PRUNED"
     },
     {
       "number": 17,
-      "value": 0.30074074074074075,
+      "value": 0.21212962962962964,
       "params": {
-        "phase1_epochs": 15,
-        "backbone_lr_ratio": 0.14025443961923134,
-        "margin": 1.7943909827798792,
-        "lr": 0.0003327528914795921,
-        "weight_decay": 0.0005185611785082372,
-        "hard_neg_ratio": 0.7649365123718748,
-        "scheduler_patience": 6
+        "lr": 0.0006298058127596508,
+        "margin": 1.6059409184067626,
+        "weight_decay": 2.8032846072924623e-05,
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.130119130701523,
+        "hard_neg_ratio": 0.7823755209455302,
+        "scheduler_patience": 4
       },
       "state": "TrialState.PRUNED"
     },
     {
       "number": 18,
-      "value": 0.31833333333333336,
+      "value": 0.30018518518518517,
       "params": {
-        "phase1_epochs": 13,
-        "backbone_lr_ratio": 0.11454415980185885,
-        "margin": 1.4439929990447233,
-        "lr": 0.0002503591394505003,
-        "weight_decay": 0.0006191738052324001,
-        "hard_neg_ratio": 0.8114759698964896,
-        "scheduler_patience": 5
+        "lr": 6.849716915345461e-05,
+        "margin": 0.568918190303444,
+        "weight_decay": 0.00047981562165459366,
+        "phase1_epochs": 14,
+        "backbone_lr_ratio": 0.14857179564913423,
+        "hard_neg_ratio": 0.6102990634895468,
+        "scheduler_patience": 2
       },
       "state": "TrialState.PRUNED"
     },
     {
       "number": 19,
-      "value": 0.29009259259259257,
+      "value": 0.23166666666666666,
       "params": {
-        "phase1_epochs": 7,
-        "backbone_lr_ratio": 0.14134374205994069,
-        "margin": 1.1755406804770425,
-        "lr": 5.970478494104581e-05,
-        "weight_decay": 0.00013601211965004836,
-        "hard_neg_ratio": 0.6547088392125368,
-        "scheduler_patience": 3
+        "lr": 0.00019171931380608802,
+        "margin": 1.4134374205994067,
+        "weight_decay": 0.00017811094548039023,
+        "phase1_epochs": 8,
+        "backbone_lr_ratio": 0.11728272868425513,
+        "hard_neg_ratio": 0.5293757800528771,
+        "scheduler_patience": 4
       },
       "state": "TrialState.PRUNED"
     },
     {
       "number": 20,
-      "value": 0.12037037037037036,
+      "value": 0.13583333333333333,
       "params": {
+        "lr": 0.0006613954056139775,
+        "margin": 0.8758060625071014,
+        "weight_decay": 2.2635292063232532e-05,
         "phase1_epochs": 11,
-        "backbone_lr_ratio": 0.19960866236935512,
-        "margin": 0.526903948971868,
-        "lr": 0.0005930758241847671,
-        "weight_decay": 2.988092072471757e-05,
-        "hard_neg_ratio": 0.7304547976730399,
-        "scheduler_patience": 4
+        "backbone_lr_ratio": 0.1755279507536961,
+        "hard_neg_ratio": 0.6556701966585377,
+        "scheduler_patience": 3
       },
       "state": "TrialState.COMPLETE"
     },
     {
       "number": 21,
-      "value": 0.12685185185185185,
+      "value": 0.11898148148148148,
       "params": {
-        "phase1_epochs": 11,
-        "backbone_lr_ratio": 0.17281352571231934,
-        "margin": 0.6552583747274263,
-        "lr": 0.000614432162943314,
-        "weight_decay": 3.0315303778712946e-05,
-        "hard_neg_ratio": 0.73588864509141,
-        "scheduler_patience": 4
+        "lr": 0.000960311741926896,
+        "margin": 1.3494718222576336,
+        "weight_decay": 0.0008336515400731112,
+        "phase1_epochs": 14,
+        "backbone_lr_ratio": 0.1399304427673029,
+        "hard_neg_ratio": 0.5047199957300887,
+        "scheduler_patience": 2
       },
       "state": "TrialState.COMPLETE"
     },
     {
       "number": 22,
-      "value": 0.1597222222222222,
+      "value": 0.13703703703703704,
       "params": {
-        "phase1_epochs": 11,
-        "backbone_lr_ratio": 0.1986816666322371,
-        "margin": 0.5336798950743792,
-        "lr": 0.0009445924522985846,
-        "weight_decay": 1.2387836848705833e-05,
-        "hard_neg_ratio": 0.8094790076763904,
-        "scheduler_patience": 5
+        "lr": 0.0009753853869306276,
+        "margin": 1.2334927650200183,
+        "weight_decay": 0.0009835787642892644,
+        "phase1_epochs": 14,
+        "backbone_lr_ratio": 0.13423430284933524,
+        "hard_neg_ratio": 0.5724012101834723,
+        "scheduler_patience": 2
       },
       "state": "TrialState.COMPLETE"
     },
     {
       "number": 23,
-      "value": 0.14787037037037037,
+      "value": 0.2608333333333333,
       "params": {
-        "phase1_epochs": 9,
-        "backbone_lr_ratio": 0.1994338076607868,
-        "margin": 0.7621415562345107,
-        "lr": 0.0006174273956543564,
-        "weight_decay": 3.2837036714148524e-05,
-        "hard_neg_ratio": 0.7389628825363432,
-        "scheduler_patience": 6
-      },
-      "state": "TrialState.COMPLETE"
-    },
-    {
-      "number": 24,
-      "value": 0.25703703703703706,
-      "params": {
-        "phase1_epochs": 13,
-        "backbone_lr_ratio": 0.1692163464213744,
-        "margin": 0.7450115613049897,
-        "lr": 0.00033341340363238935,
-        "weight_decay": 0.00031765284149808603,
-        "hard_neg_ratio": 0.6642746547897292,
-        "scheduler_patience": 4
+        "lr": 0.00041801494671762083,
+        "margin": 1.5013334662605522,
+        "weight_decay": 0.000545797215793738,
+        "phase1_epochs": 15,
+        "backbone_lr_ratio": 0.15168588152048693,
+        "hard_neg_ratio": 0.5062792745809508,
+        "scheduler_patience": 2
       },
       "state": "TrialState.PRUNED"
     },
     {
-      "number": 25,
-      "value": 0.27685185185185185,
+      "number": 24,
+      "value": 0.2025925925925926,
       "params": {
+        "lr": 0.0006132893829821234,
+        "margin": 1.8035290862957027,
+        "weight_decay": 0.000426574447761831,
         "phase1_epochs": 12,
-        "backbone_lr_ratio": 0.15088831901068286,
-        "margin": 0.5188184133806866,
-        "lr": 0.0006924666166778878,
-        "weight_decay": 1.8714467267577117e-05,
-        "hard_neg_ratio": 0.8982551607058102,
+        "backbone_lr_ratio": 0.12158007744391695,
+        "hard_neg_ratio": 0.596101281770701,
         "scheduler_patience": 3
       },
       "state": "TrialState.PRUNED"
     },
     {
-      "number": 26,
-      "value": 0.19953703703703704,
+      "number": 25,
+      "value": 0.2651851851851852,
       "params": {
+        "lr": 0.0004046827783243765,
+        "margin": 1.1315894540163727,
+        "weight_decay": 0.0006685823544334856,
         "phase1_epochs": 14,
-        "backbone_lr_ratio": 0.18204859467564347,
-        "margin": 0.8610616416653827,
-        "lr": 0.00036126871506212506,
-        "weight_decay": 5.263674780287424e-05,
-        "hard_neg_ratio": 0.7310365866154781,
+        "backbone_lr_ratio": 0.0953108121204138,
+        "hard_neg_ratio": 0.5351855536382568,
+        "scheduler_patience": 5
+      },
+      "state": "TrialState.PRUNED"
+    },
+    {
+      "number": 26,
+      "value": 0.21046296296296296,
+      "params": {
+        "lr": 0.0007268231224827056,
+        "margin": 1.27836147031906,
+        "weight_decay": 0.00021373832823010428,
+        "phase1_epochs": 13,
+        "backbone_lr_ratio": 0.1425645684025884,
+        "hard_neg_ratio": 0.5532201048537977,
         "scheduler_patience": 2
       },
       "state": "TrialState.PRUNED"
     },
     {
       "number": 27,
-      "value": 0.17194444444444446,
+      "value": 0.26157407407407407,
       "params": {
-        "phase1_epochs": 8,
-        "backbone_lr_ratio": 0.10568181079982632,
-        "margin": 1.1155954800699655,
-        "lr": 0.00017914331391942202,
-        "weight_decay": 0.00010771410782743428,
-        "hard_neg_ratio": 0.6219995984194508,
-        "scheduler_patience": 4
-      },
-      "state": "TrialState.PRUNED"
-    },
-    {
-      "number": 28,
-      "value": 0.22777777777777777,
-      "params": {
-        "phase1_epochs": 9,
-        "backbone_lr_ratio": 0.13464315542812894,
-        "margin": 1.3901682207602093,
-        "lr": 0.0005240883018108978,
-        "weight_decay": 0.0002053771419968364,
-        "hard_neg_ratio": 0.8328395368255969,
-        "scheduler_patience": 5
-      },
-      "state": "TrialState.PRUNED"
-    },
-    {
-      "number": 29,
-      "value": 0.2923148148148148,
-      "params": {
-        "phase1_epochs": 10,
-        "backbone_lr_ratio": 0.17488854712096744,
-        "margin": 1.7986535939848816,
-        "lr": 0.0001387806258847557,
-        "weight_decay": 0.0006121523750533266,
-        "hard_neg_ratio": 0.6922441616934757,
+        "lr": 0.00014536371936729774,
+        "margin": 1.0294277824498974,
+        "weight_decay": 6.61902426857293e-05,
+        "phase1_epochs": 11,
+        "backbone_lr_ratio": 0.10974908375439493,
+        "hard_neg_ratio": 0.5019951493635908,
         "scheduler_patience": 3
       },
       "state": "TrialState.PRUNED"
     },
     {
-      "number": 30,
-      "value": 0.2676851851851852,
+      "number": 28,
+      "value": 0.24648148148148147,
       "params": {
-        "phase1_epochs": 14,
-        "backbone_lr_ratio": 0.1899375106661595,
-        "margin": 0.6744006005878947,
-        "lr": 0.0002823190828490375,
-        "weight_decay": 0.00011567927796098014,
-        "hard_neg_ratio": 0.7931393859296694,
-        "scheduler_patience": 6
-      },
-      "state": "TrialState.PRUNED"
-    },
-    {
-      "number": 31,
-      "value": 0.13712962962962963,
-      "params": {
-        "phase1_epochs": 7,
-        "backbone_lr_ratio": 0.18245091278603973,
-        "margin": 1.287094916958147,
-        "lr": 0.0007606419341001471,
-        "weight_decay": 0.00015552981425622953,
-        "hard_neg_ratio": 0.5118821330568321,
-        "scheduler_patience": 5
-      },
-      "state": "TrialState.COMPLETE"
-    },
-    {
-      "number": 32,
-      "value": 0.19972222222222222,
-      "params": {
-        "phase1_epochs": 8,
-        "backbone_lr_ratio": 0.1941137572453537,
-        "margin": 1.5956000647723374,
-        "lr": 0.0005472367106547504,
-        "weight_decay": 8.076140269050862e-05,
-        "hard_neg_ratio": 0.5314749889699512,
+        "lr": 0.00048251185788176885,
+        "margin": 1.769567066939337,
+        "weight_decay": 0.0006734693352297253,
+        "phase1_epochs": 12,
+        "backbone_lr_ratio": 0.16315666317860797,
+        "hard_neg_ratio": 0.5771938119452743,
         "scheduler_patience": 4
       },
       "state": "TrialState.PRUNED"
     },
     {
-      "number": 33,
-      "value": 0.11972222222222222,
+      "number": 29,
+      "value": 0.2822222222222222,
       "params": {
-        "phase1_epochs": 6,
-        "backbone_lr_ratio": 0.17597790919013243,
-        "margin": 0.9995522815754643,
-        "lr": 0.0009871125444687223,
-        "weight_decay": 0.0001350758930191199,
-        "hard_neg_ratio": 0.569065348727364,
-        "scheduler_patience": 5
-      },
-      "state": "TrialState.COMPLETE"
-    },
-    {
-      "number": 34,
-      "value": 0.13046296296296298,
-      "params": {
-        "phase1_epochs": 6,
-        "backbone_lr_ratio": 0.1652841647156193,
-        "margin": 0.9835662096966661,
-        "lr": 0.0009722316458407933,
-        "weight_decay": 2.1574917403865827e-05,
-        "hard_neg_ratio": 0.5750592947215524,
-        "scheduler_patience": 5
-      },
-      "state": "TrialState.COMPLETE"
-    },
-    {
-      "number": 35,
-      "value": 0.31601851851851853,
-      "params": {
-        "phase1_epochs": 6,
-        "backbone_lr_ratio": 0.1893297514579088,
-        "margin": 0.8572762690921458,
-        "lr": 1.0488101410479342e-05,
-        "weight_decay": 0.0003186551515356195,
-        "hard_neg_ratio": 0.5525174433533565,
-        "scheduler_patience": 4
-      },
-      "state": "TrialState.PRUNED"
-    },
-    {
-      "number": 36,
-      "value": 0.11342592592592593,
-      "params": {
-        "phase1_epochs": 5,
-        "backbone_lr_ratio": 0.1485242295072201,
-        "margin": 1.0756514566703983,
-        "lr": 0.0007668384507514126,
-        "weight_decay": 9.356772628212719e-05,
-        "hard_neg_ratio": 0.5269158273618015,
-        "scheduler_patience": 6
-      },
-      "state": "TrialState.COMPLETE"
-    },
-    {
-      "number": 37,
-      "value": 0.3012037037037037,
-      "params": {
-        "phase1_epochs": 5,
-        "backbone_lr_ratio": 0.1313628532216672,
-        "margin": 1.0434918550513836,
-        "lr": 2.5980690920245914e-05,
-        "weight_decay": 9.04658707087067e-05,
-        "hard_neg_ratio": 0.5941826643030722,
+        "lr": 9.463846279204495e-05,
+        "margin": 0.6852793255492775,
+        "weight_decay": 0.00011459456625283297,
+        "phase1_epochs": 9,
+        "backbone_lr_ratio": 0.08154827644851323,
+        "hard_neg_ratio": 0.6405114480881257,
         "scheduler_patience": 2
       },
       "state": "TrialState.PRUNED"
-    },
-    {
-      "number": 38,
-      "value": 0.12648148148148147,
-      "params": {
-        "phase1_epochs": 6,
-        "backbone_lr_ratio": 0.1476147444110309,
-        "margin": 0.9242714700720287,
-        "lr": 0.00040607099539005073,
-        "weight_decay": 5.858000050769536e-05,
-        "hard_neg_ratio": 0.5280143708710837,
-        "scheduler_patience": 5
-      },
-      "state": "TrialState.COMPLETE"
-    },
-    {
-      "number": 39,
-      "value": 0.12814814814814815,
-      "params": {
-        "phase1_epochs": 5,
-        "backbone_lr_ratio": 0.13026615198308403,
-        "margin": 0.5883155542686024,
-        "lr": 0.0001278810803443974,
-        "weight_decay": 4.108475532025522e-05,
-        "hard_neg_ratio": 0.5711935252412919,
-        "scheduler_patience": 4
-      },
-      "state": "TrialState.COMPLETE"
     }
   ]
 }

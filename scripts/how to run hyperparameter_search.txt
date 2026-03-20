@@ -6,24 +6,24 @@ Commands:
 python scripts/hyperparameter_search.py \
     --dataset cedar \
     --split_file data/ratio_splits/cedar_split_70_15_15.json \
-    --n_trials 40 \
-    --epochs_per_trial 30 \
+    --n_trials 30 \
+    --epochs_per_trial 100 \
     --output_dir checkpoints/hparam_search
 
 # BHSig-Bengali
 python scripts/hyperparameter_search.py \
     --dataset bhsig_bengali \
     --split_file data/ratio_splits/bhsig_bengali_split_70_15_15.json \
-    --n_trials 40 \
-    --epochs_per_trial 30 \
+    --n_trials 30 \
+    --epochs_per_trial 100 \
     --output_dir checkpoints/hparam_search
 
 # BHSig-Hindi
 python scripts/hyperparameter_search.py \
     --dataset bhsig_hindi \
     --split_file data/ratio_splits/bhsig_hindi_split_70_15_15.json \
-    --n_trials 40 \
-    --epochs_per_trial 30 \
+    --n_trials 30 \
+    --epochs_per_trial 100 \
     --output_dir checkpoints/hparam_search
 
 
