@@ -12,6 +12,6 @@
     "precision": 0.7222222222222222,
     "recall": 0.7222222222222222,
     "f1": 0.7222222222222222,
-    "train_time_seconds": 87.86
+    "train_time_seconds": 86.1
   }
 }
