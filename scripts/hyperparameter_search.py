@@ -3,8 +3,8 @@
 #
 # Usage:
 #   python scripts/hyperparameter_search.py \
-#       --dataset cedar \
-#       --split_file data/ratio_splits/cedar_split_70_15_15.json \
+#       --dataset hindi \
+#       --split_file data/ratio_splits/hindi_split_70_15_15.json \
 #       --n_trials 40 \
 #       --epochs_per_trial 100 \
 #       --output_dir checkpoints/hparam_search
@@ -347,15 +347,15 @@ def run_search(args):
 
     t0 = time.time()
     
-    # Enqueue a baseline conservative start point
+    # ── Warm Start: Enqueue the known high-performing Hindi baseline ──────────
     study.enqueue_trial({
-        'margin':             1.0,
-        'lr':                 1e-4,
-        'weight_decay':       1e-4,
-        'phase1_epochs':      10,
-        'backbone_lr_ratio':  0.1,
-        'hard_neg_ratio':     0.7,
-        'scheduler_patience': 3
+        'lr':                 5.1e-4,
+        'margin':             0.73,
+        'weight_decay':       4.5e-4,
+        'phase1_epochs':      9,
+        'backbone_lr_ratio':  0.12,
+        'hard_neg_ratio':     0.72,
+        'scheduler_patience': 2
     })
     
     study.optimize(
