@@ -11,7 +11,7 @@
     "precision": 0.6865284974093264,
     "recall": 0.7361111111111112,
     "f1": 0.710455764075067,
-    "train_time_seconds": 108.79
+    "train_time_seconds": 111.78
   },
   "BHSig-Bengali (65:18:18)": {
     "dataset": "BHSig-Bengali",
@@ -25,7 +25,7 @@
     "precision": 0.8042452830188679,
     "recall": 0.8357843137254902,
     "f1": 0.8197115384615384,
-    "train_time_seconds": 193.2
+    "train_time_seconds": 194.57
   },
   "BHSig-Bengali (60:20:20)": {
     "dataset": "BHSig-Bengali",
@@ -39,6 +39,6 @@
     "precision": 0.8464646464646465,
     "recall": 0.8729166666666667,
     "f1": 0.8594871794871795,
-    "train_time_seconds": 213.4
+    "train_time_seconds": 211.82
   }
 }
