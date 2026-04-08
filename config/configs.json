@@ -29,12 +29,12 @@
     "dataset_name": "BHSig-Hindi",
     "epochs": 100,
     "phase1_epochs": 13,
-    "lr": 0.0003631126919850215,
-    "margin": 0.5538629628394433,
-    "weight_decay": 0.0008250424348545071,
+    "lr": 3.63e-4,
+    "margin": 0.55,
+    "weight_decay": 8.25e-4,
     "batch_size": 32,
-    "backbone_lr_ratio": 0.08894603873252609,
-    "hard_neg_ratio": 0.5026988564275506,
+    "backbone_lr_ratio": 0.09,
+    "hard_neg_ratio": 0.50,
     "scheduler_patience": 3,
     "zero_active_patience": 5
   }

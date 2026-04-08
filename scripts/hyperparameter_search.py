@@ -1,14 +1,6 @@
 # =============================================================================
 # Bayesian Hyperparameter Optimization for tDCBAM using Optuna
 #
-# Usage:
-#   python scripts/hyperparameter_search.py \
-#       --dataset hindi \
-#       --split_file data/ratio_splits/hindi_split_70_15_15.json \
-#       --n_trials 40 \
-#       --epochs_per_trial 100 \
-#       --output_dir checkpoints/hparam_search
-#
 # Strategy:
 #   Trials are given a full epoch budget (e.g., 100). Termination is handled
 #   dynamically by early stopping when the TripletLoss active fraction drops 
@@ -347,15 +339,14 @@ def run_search(args):
 
     t0 = time.time()
     
-    # ── Warm Start: Enqueue the known high-performing Hindi baseline ──────────
     study.enqueue_trial({
-        'lr':                 5.1e-4,
-        'margin':             0.73,
-        'weight_decay':       4.5e-4,
-        'phase1_epochs':      9,
-        'backbone_lr_ratio':  0.12,
-        'hard_neg_ratio':     0.72,
-        'scheduler_patience': 2
+        'lr':                 5.60e-4,
+        'margin':             0.67,
+        'weight_decay':       1.60e-5,
+        'phase1_epochs':      8,
+        'backbone_lr_ratio':  0.13,
+        'hard_neg_ratio':     0.77,
+        'scheduler_patience': 5
     })
     
     study.optimize(
