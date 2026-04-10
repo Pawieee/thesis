@@ -340,12 +340,12 @@ def run_search(args):
     t0 = time.time()
     
     study.enqueue_trial({
-        'lr':                 5.60e-4,
-        'margin':             0.67,
-        'weight_decay':       1.60e-5,
-        'phase1_epochs':      8,
-        'backbone_lr_ratio':  0.13,
-        'hard_neg_ratio':     0.77,
+        'lr':                 7.18e-4,
+        'margin':             0.52,
+        'weight_decay':       1.78e-4,
+        'phase1_epochs':      13,
+        'backbone_lr_ratio':  0.12,
+        'hard_neg_ratio':     0.51,
         'scheduler_patience': 5
     })
     

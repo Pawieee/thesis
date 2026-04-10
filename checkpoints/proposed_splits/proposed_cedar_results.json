@@ -42,16 +42,16 @@
   },
   "timing": {
     "CEDAR (70:15:15)": {
-      "train_s": 844.7,
-      "total_s": 844.7
+      "train_s": 847.5,
+      "total_s": 847.5
     },
     "CEDAR (65:18:18)": {
-      "train_s": 680.3,
-      "total_s": 680.3
+      "train_s": 678.2,
+      "total_s": 678.2
     },
     "CEDAR (60:20:20)": {
-      "train_s": 994.1,
-      "total_s": 994.1
+      "train_s": 969.8,
+      "total_s": 969.8
     }
   }
 }
