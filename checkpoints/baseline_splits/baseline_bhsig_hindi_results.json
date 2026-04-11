@@ -1,18 +1,4 @@
 {
-  "BHSig-Hindi (70:15:15)": {
-    "dataset": "BHSig-Hindi",
-    "split": "70:15:15",
-    "train_users": 112,
-    "val_users": 24,
-    "test_users": 24,
-    "eer": 0.21805555555555556,
-    "accuracy": 0.7816358024691358,
-    "auc": 0.8762683256172841,
-    "precision": 0.7413509060955519,
-    "recall": 0.78125,
-    "f1": 0.760777683854607,
-    "train_time_seconds": 143.28
-  },
   "BHSig-Hindi (65:18:18)": {
     "dataset": "BHSig-Hindi",
     "split": "65:18:18",
@@ -25,20 +11,6 @@
     "precision": 0.8263988522238164,
     "recall": 0.8571428571428571,
     "f1": 0.8414901387874361,
-    "train_time_seconds": 222.35
-  },
-  "BHSig-Hindi (60:20:20)": {
-    "dataset": "BHSig-Hindi",
-    "split": "60:20:20",
-    "train_users": 96,
-    "val_users": 32,
-    "test_users": 32,
-    "eer": 0.21354166666666666,
-    "accuracy": 0.7858796296296297,
-    "auc": 0.8729899088541667,
-    "precision": 0.7462871287128713,
-    "recall": 0.78515625,
-    "f1": 0.7652284263959391,
-    "train_time_seconds": 261.34
+    "train_time_seconds": 188.04
   }
 }
