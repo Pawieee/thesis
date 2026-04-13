@@ -1,17 +1,32 @@
 {
-  "CEDAR (60:20:20)": {
+  "CEDAR (70:15:15)": {
     "dataset": "CEDAR",
-    "split": "60:20:20",
+    "split": "70:15:15",
     "ablation": "A \u2014 CBAM only (classification)",
-    "train_users": 33,
-    "val_users": 11,
+    "train_users": 38,
+    "val_users": 8,
+    "test_users": 9,
+    "eer": 0.2777777777777778,
+    "accuracy": 0.7222222222222222,
+    "auc": 0.7930598422496572,
+    "precision": 0.7222222222222222,
+    "recall": 0.7222222222222222,
+    "f1": 0.7222222222222222,
+    "train_time_seconds": 79.41
+  },
+  "CEDAR (65:18:18)": {
+    "dataset": "CEDAR",
+    "split": "65:18:18",
+    "ablation": "A \u2014 CBAM only (classification)",
+    "train_users": 35,
+    "val_users": 9,
     "test_users": 11,
-    "eer": 0.23484848484848486,
-    "accuracy": 0.7632575757575758,
-    "auc": 0.8297032828282829,
-    "precision": 0.7642585551330798,
-    "recall": 0.7613636363636364,
-    "f1": 0.7628083491461101,
-    "train_time_seconds": 120.34
+    "eer": 0.1893939393939394,
+    "accuracy": 0.8143939393939394,
+    "auc": 0.8565269168962351,
+    "precision": 0.8120300751879699,
+    "recall": 0.8181818181818182,
+    "f1": 0.8150943396226416,
+    "train_time_seconds": 134.23
   }
 }

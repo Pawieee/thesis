@@ -42,16 +42,16 @@
   },
   "timing": {
     "BHSig-Bengali (70:15:15)": {
-      "train_s": 1373.4,
-      "total_s": 1373.4
+      "train_s": 1407.5,
+      "total_s": 1407.5
     },
     "BHSig-Bengali (65:18:18)": {
-      "train_s": 1434.4,
-      "total_s": 1434.4
+      "train_s": 1505.0,
+      "total_s": 1505.0
     },
     "BHSig-Bengali (60:20:20)": {
-      "train_s": 1577.5,
-      "total_s": 1577.5
+      "train_s": 1655.4,
+      "total_s": 1655.4
     }
   }
 }
