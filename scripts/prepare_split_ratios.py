@@ -188,7 +188,7 @@ def create_split(user_dict, train_ratio, val_ratio, seed=42):
         "test": {uid: user_dict[uid] for uid in test_ids}
     }
     
-    return split, len(train_ids), len(val_ids), len(test_ids)    return split, len(train_ids), len(val_ids), len(test_ids)
+    return split, len(train_ids), len(val_ids), len(test_ids)
 
 
 def main():
