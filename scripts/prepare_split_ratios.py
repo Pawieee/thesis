@@ -147,7 +147,7 @@ def create_split(user_dict, train_ratio, val_ratio, seed=42):
     
     Args:
         user_dict: {uid: {"genuine": [...], "forged": [...]}}
-        train_ratio: float (e.g., 0.65 for 65%)
+        train_ratio: float (e.g., 0.64 for 64%)
         val_ratio: float (e.g., 0.18 for 18%)
         seed: random seed
     
@@ -160,8 +160,10 @@ def create_split(user_dict, train_ratio, val_ratio, seed=42):
     random.shuffle(user_ids)
     
     total_users = len(user_ids)
-    n_train = int(total_users * train_ratio)
-    n_val = int(total_users * val_ratio)
+    
+    # Use standard rounding round() instead of truncating int()
+    n_train = round(total_users * train_ratio)
+    n_val = round(total_users * val_ratio)
     
     # Ensure at least 1 user in each split
     n_train = max(1, n_train)
@@ -186,7 +188,7 @@ def create_split(user_dict, train_ratio, val_ratio, seed=42):
         "test": {uid: user_dict[uid] for uid in test_ids}
     }
     
-    return split, len(train_ids), len(val_ids), len(test_ids)
+    return split, len(train_ids), len(val_ids), len(test_ids)    return split, len(train_ids), len(val_ids), len(test_ids)
 
 
 def main():
