@@ -54,7 +54,7 @@ def main():
         "--data_root", data_root,
         "--output_dir", output_dir,
         "--seed", "42",
-        "--ratios", "65:18:18,70:15:15,60:20:20"
+        "--ratios", "64:18:18,70:15:15,60:20:20"
     ]
     
     print(f"Running: {' '.join(cmd)}")
