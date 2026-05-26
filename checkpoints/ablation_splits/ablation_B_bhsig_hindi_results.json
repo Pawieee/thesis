@@ -6,27 +6,27 @@
     "train_users": 112,
     "val_users": 24,
     "test_users": 24,
-    "eer": 0.15144675925925927,
-    "accuracy": 0.8485609103078983,
-    "auc": 0.9277351569139716,
-    "precision": 0.6823258072347658,
-    "recall": 0.8485809178743962,
-    "f1": 0.7564257838783475,
-    "train_time_seconds": 2222.9
+    "eer": 0.15596064814814814,
+    "accuracy": 0.8440428380187416,
+    "auc": 0.9193569312349035,
+    "precision": 0.6747525947381124,
+    "recall": 0.8440519323671497,
+    "f1": 0.7499664654594232,
+    "train_time_seconds": 2203.84
   },
-  "BHSig-Hindi (65:18:18)": {
+  "BHSig-Hindi (64:18:18)": {
     "dataset": "BHSig-Hindi",
-    "split": "65:18:18",
+    "split": "64:18:18",
     "ablation": "B \u2014 Triplet only (no CBAM)",
-    "train_users": 104,
-    "val_users": 28,
-    "test_users": 28,
-    "eer": 0.13129960317460318,
-    "accuracy": 0.868689041881813,
-    "auc": 0.9391286439847677,
-    "precision": 0.7172008547008547,
-    "recall": 0.8686594202898551,
-    "f1": 0.7856975655430711,
-    "train_time_seconds": 2334.02
+    "train_users": 102,
+    "val_users": 29,
+    "test_users": 29,
+    "eer": 0.10756704980842911,
+    "accuracy": 0.8924664173937128,
+    "auc": 0.9559174944376472,
+    "precision": 0.7608093716719915,
+    "recall": 0.8925537231384307,
+    "f1": 0.8214326779349201,
+    "train_time_seconds": 2313.98
   }
 }

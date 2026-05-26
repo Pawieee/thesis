@@ -12,7 +12,7 @@
     "precision": 0.7873754152823921,
     "recall": 0.8229166666666666,
     "f1": 0.8047538200339559,
-    "train_time_seconds": 184.94
+    "train_time_seconds": 183.26
   },
   "BHSig-Hindi (64:18:18)": {
     "dataset": "BHSig-Hindi",
@@ -27,6 +27,6 @@
     "precision": 0.7881705639614855,
     "recall": 0.8232758620689655,
     "f1": 0.8053408292340126,
-    "train_time_seconds": 338.06
+    "train_time_seconds": 335.64
   }
 }

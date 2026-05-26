@@ -12,7 +12,7 @@
     "precision": 0.7222222222222222,
     "recall": 0.7222222222222222,
     "f1": 0.7222222222222222,
-    "train_time_seconds": 81.36
+    "train_time_seconds": 83.98
   },
   "CEDAR (64:18:18)": {
     "dataset": "CEDAR",
@@ -27,6 +27,6 @@
     "precision": 0.7615062761506276,
     "recall": 0.7583333333333333,
     "f1": 0.7599164926931107,
-    "train_time_seconds": 137.22
+    "train_time_seconds": 133.5
   }
 }
