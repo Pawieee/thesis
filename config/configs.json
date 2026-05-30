@@ -1,7 +1,7 @@
 {
   "cedar": {
     "dataset_name": "CEDAR",
-    "epochs": 150,
+    "epochs": 100,
     "phase1_epochs": 9,
     "lr": 0.00041141196210139663,
     "margin": 0.5810248543810292,
