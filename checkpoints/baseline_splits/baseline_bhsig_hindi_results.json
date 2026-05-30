@@ -11,34 +11,6 @@
     "precision": 0.7413509060955519,
     "recall": 0.78125,
     "f1": 0.760777683854607,
-    "train_time_seconds": 127.89
-  },
-  "BHSig-Hindi (64:18:18)": {
-    "dataset": "BHSig-Hindi",
-    "split": "64:18:18",
-    "train_users": 102,
-    "val_users": 29,
-    "test_users": 29,
-    "eer": 0.15517241379310345,
-    "accuracy": 0.8448275862068966,
-    "auc": 0.9196228035407583,
-    "precision": 0.8132780082987552,
-    "recall": 0.8448275862068966,
-    "f1": 0.828752642706131,
-    "train_time_seconds": 169.61
-  },
-  "BHSig-Hindi (60:20:20)": {
-    "dataset": "BHSig-Hindi",
-    "split": "60:20:20",
-    "train_users": 96,
-    "val_users": 32,
-    "test_users": 32,
-    "eer": 0.21354166666666666,
-    "accuracy": 0.7858796296296297,
-    "auc": 0.8729899088541667,
-    "precision": 0.7462871287128713,
-    "recall": 0.78515625,
-    "f1": 0.7652284263959391,
-    "train_time_seconds": 252.28
+    "train_time_seconds": 138.5
   }
 }
