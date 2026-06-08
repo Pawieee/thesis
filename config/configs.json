@@ -14,7 +14,7 @@
   },
   "bhsig_bengali": {
     "dataset_name": "BHSig-Bengali",
-    "epochs": 100,
+    "epochs": 150,
     "phase1_epochs": 13,
     "lr": 0.0007180493340227167,
     "margin": 0.5197650986950104,
@@ -27,7 +27,7 @@
   },
   "bhsig_hindi": {
     "dataset_name": "BHSig-Hindi",
-    "epochs": 100,
+    "epochs": 150,
     "phase1_epochs": 13,
     "lr": 0.0003631126919850215,
     "margin": 0.5538629628394433,
