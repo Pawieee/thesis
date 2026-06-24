@@ -1,4 +1,4 @@
-# tDCBAM: Enhanced DenseNet-121 with Triplet Network-Based Metric Learning and Convolutional Block Attention for Offline Signature Verification
+# TDCBAM: Enhanced DenseNet-121 with Triplet Network-Based Metric Learning and Convolutional Block Attention for Offline Signature Verification
 
 > Triplet-trained Deep Convolutional network with CBAM attention (tDCBAM) for writer-independent offline handwritten signature verification across CEDAR, BHSig-Bengali, and BHSig-Hindi benchmark datasets.
 
@@ -34,7 +34,7 @@
 
 Offline handwritten signature verification is a biometric authentication task where a system determines whether a query signature is genuine or forged relative to a set of reference signatures from a known writer. The core challenge is **writer-independent generalization** — the system must discriminate genuine from skilled forgeries for writers never encountered during training.
 
-This repository presents **tDCBAM** (Triplet Deep Convolutional with Block Attention Module), a metric learning framework that addresses this challenge through three integrated contributions:
+This repository presents **TDCBAM** (Triplet Deep Convolutional with Block Attention Module), a metric learning framework that addresses this challenge through three integrated contributions:
 
 1. **CBAM-augmented DenseNet-121 backbone** — Convolutional Block Attention Modules (CBAM) are inserted after each Dense Block and before each Transition layer, allowing the network to recalibrate feature responses along both channel and spatial dimensions before feature compression. This directs the backbone's representational capacity toward discriminative stroke-level features relevant to signature identity.
 
@@ -42,7 +42,7 @@ This repository presents **tDCBAM** (Triplet Deep Convolutional with Block Atten
 
 3. **Offline Hard Negative Mining** — Training triplets are constructed with a curriculum that mixes 70% skilled forgeries (hard negatives) from the same writer with 30% genuine signatures from other writers (easy negatives), providing a structured gradient signal that scales with the difficulty of the forgery discrimination task.
 
-The proposed system is evaluated against a DenseNet-121 classification baseline (Kandeil et al., 2023) across three benchmark datasets using a strict writer-disjoint 70:15:15 train/validation/test split protocol.
+The enhanced system is evaluated against a DenseNet-121 classification baseline (Kandeil et al., 2023) across three benchmark datasets using a strict writer-disjoint 70:15:15 train/validation/test split protocol.
 
 ---
 
@@ -279,13 +279,13 @@ The evaluation protocol uses **exhaustive pairwise comparison** on the validatio
 
 All results are reported on the held-out test set using the EER threshold derived from the validation set.
 
-| Dataset | EER ↓ | AUC ↑ | Accuracy ↑ | Precision ↑ | Recall ↑ | F1 ↑ |
+| Dataset | EER  | AUC  | Accuracy  | Precision  | Recall  | F1-score  |
 |---|---|---|---|---|---|---|
-| CEDAR | 24.23% | 0.8423 | 75.77% | 59.97% | 75.76% | 66.95% |
-| BHSig-Bengali | 11.29% | 0.9621 | 88.71% | 75.08% | 88.70% | 81.32% |
-| BHSig-Hindi | — | — | — | — | — | — |
+| CEDAR | 16.03% | 91.94% | 83.97% | 71.51% | 83.98% | 77.24% |
+| BHSig-Bengali | 8.01% | 97.12% | 91.99% | 81.49% | 92.00% | 86.43% |
+| BHSig-Hindi | 13.69% | 93.63% | 86.31% | 70.74% | 86.31% | 77.75% |
 
-**Note on CEDAR performance:** CEDAR contains only 38 training writers under the 70:15:15 split. This is a genuinely small training set for triplet metric learning, which typically benefits from diverse writer populations to learn a generalizable embedding space. The model shows stronger performance on BHSig-Bengali (70 training writers) where the training set is nearly twice as large. Performance on CEDAR is limited by dataset size rather than architectural capacity.
+
 
 ---
 
@@ -293,7 +293,7 @@ All results are reported on the held-out test set using the EER threshold derive
 
 The baseline model is a faithful replication of the DenseNet-121 classification system described in Kandeil et al. (2023), using the exact hyperparameters reported in Table 1 of that paper:
 
-| Configuration | Baseline (Kandeil et al., 2023) | Proposed (tDCBAM) |
+| Configuration | Baseline (Kandeil et al., 2023) | TDCBAM |
 |---|---|---|
 | Architecture | DenseNet-121 | DenseNet-121 + CBAM |
 | Training paradigm | Binary classification | Metric learning (triplet) |
@@ -303,13 +303,15 @@ The baseline model is a faithful replication of the DenseNet-121 classification 
 | Inference | Softmax probability | L2 distance on unit sphere |
 | Output space | 2-class logits | 1024-dim unit hypersphere |
 
-The key architectural difference is the training paradigm. The baseline learns a closed-set classifier that maps signatures to a binary genuine/forged decision for the specific writers seen during training. The proposed model learns an open-set metric space where verification generalizes to unseen writers by distance comparison — this is the fundamental advantage of metric learning over classification for biometric verification tasks.
+The key architectural difference is the training paradigm. The baseline learns a closed-set classifier that maps signatures to a binary genuine/forged decision for the specific writers seen during training. The TDCBAM model learns an open-set metric space where verification generalizes to unseen writers by distance comparison — this is the fundamental advantage of metric learning over classification for biometric verification tasks.
 
 ---
 
 ## Repository Structure
 
 ```
+├── config/
+│   ├── configs.json                # Key configurations per dataset
 ├── dataloader/
 │   └── tDCBAM_trainloader.py       # Preprocessing, augmentation, SplitTripletDataset,
 │                                   # SplitPairDataset, SplitImageDataset,
@@ -318,26 +320,28 @@ The key architectural difference is the training paradigm. The baseline learns a
 │   ├── triplet_loss.py             # Offline element-wise TripletLoss (SED)
 │   └── online_triplet_loss.py      # Online batch hard mining OnlineTripletLoss
 ├── models/
-│   ├── feature_extractor.py        # DenseNetFeatureExtractor (baseline + proposed)
+│   ├── feature_extractor.py        # DenseNetFeatureExtractor (baseline + TDCBAM)
 │   │                               # ChannelAttention, SpatialAttention, CBAMBlock
 │   └── Triplet_Siamese_Similarity_Network.py  # tDCBAM triplet wrapper
-├── utils/
-│   └── model_evaluation.py         # compute_metrics, EER, AUC, plot utilities
+
 ├── notebooks/
-│   ├── tDCBAM_cedar.ipynb          # Proposed model — CEDAR
-│   ├── tDCBAM_bengali.ipynb        # Proposed model — BHSig-Bengali
-│   ├── tDCBAM_hindi.ipynb          # Proposed model — BHSig-Hindi
+│   ├── tDCBAM_cedar.ipynb          # TDCBAM model — CEDAR
+│   ├── tDCBAM_bengali.ipynb        # TDCBAM model — BHSig-Bengali
+│   ├── tDCBAM_hindi.ipynb          # TDCBAM model — BHSig-Hindi
 │   ├── baseline_cedar.ipynb        # Baseline — CEDAR
 │   ├── baseline_bengali.ipynb      # Baseline — BHSig-Bengali
 │   └── baseline_hindi.ipynb        # Baseline — BHSig-Hindi
 ├── scripts/
 │   └── prepare_split_ratios.py     # Writer-disjoint train/val/test split generator
+├── utils/
+│   └── model_evaluation.py         # compute_metrics, EER, AUC, plot utilities
 ├── data/
 │   └── ratio_splits/               # Generated split JSON files (gitignored)
 ├── checkpoints/
-│   ├── proposed_splits/            # Proposed model checkpoints (gitignored)
+│   ├── proposed_splits/            # TDCBAM model checkpoints (gitignored)
 │   └── baseline_splits/            # Baseline model checkpoints (gitignored)
 ├── model_evals/                    # Evaluation plots and metrics (gitignored)
+├── main.py                         # Initializes datasets
 ├── requirements.txt
 ├── pyproject.toml
 └── README.md
@@ -347,12 +351,12 @@ The key architectural difference is the training paradigm. The baseline learns a
 
 ## Installation
 
-**Requirements:** Python 3.10+, CUDA 11.8+, PyTorch 2.4+
+**Requirements:** Python 3.10+, CUDA 11.8+, PyTorch 2.4+, uv for package management
 
 ```bash
 # Clone the repository
-git clone https://github.com/j4304/gege.git
-cd gege
+git clone https://github.com/Pawieee/thesis.git
+cd thesis
 
 # Create and activate virtual environment
 python -m venv .venv
@@ -383,16 +387,14 @@ tqdm>=4.66.0
 
 ### 1. Prepare Dataset Splits
 
-Generate writer-disjoint train/val/test splits for all datasets. The script automatically discovers datasets under `--data_root` and outputs split JSON files compatible with both the baseline and proposed pipelines:
+Generate writer-disjoint train/val/test splits for all datasets. The script automatically discovers datasets under `--data_root` and outputs split JSON files compatible with both the baseline and TDCBAM pipelines:
+
+
+**ensure kaggle.json is set**
 
 ```bash
-python scripts/prepare_split_ratios.py \
-    --data_root ./data \
-    --output_dir ./data/ratio_splits \
-    --ratios 70:15:15 \
-    --seed 42
+uv run main.py
 ```
-
 Expected data directory structure:
 
 ```
@@ -405,8 +407,7 @@ data/
     ├── BHSig100_Bengali/     # B-S-<uid>-G-<sid>.tif / B-S-<uid>-F-<sid>.tif
     └── BHSig160_Hindi/       # H-S-<uid>-G-<sid>.tif / H-S-<uid>-F-<sid>.tif
 ```
-
-### 2. Train the Proposed Model
+### 2. Train the TDCBAM Model
 
 Open and run the appropriate notebook:
 
@@ -416,8 +417,9 @@ notebooks/tDCBAM_cedar.ipynb      # CEDAR
 notebooks/tDCBAM_hindi.ipynb      # BHSig-Hindi
 ```
 
-Key configuration parameters (Step 2 of each notebook):
+Key configuration parameters:
 
+*Sample values, refer to config.json*
 ```python
 TRAIN_EPOCHS        = 100    # total training epochs
 TRAIN_PHASE1_EPOCHS = 20     # epochs with backbone frozen (Phase 1)
@@ -448,7 +450,7 @@ MOMENTUM   = 0.99    # paper: momentum = 0.99 → Adam beta1
 
 ## Configuration Reference
 
-### Proposed Model
+### TDCBAM Model
 
 | Parameter | Value | Description |
 |---|---|---|
